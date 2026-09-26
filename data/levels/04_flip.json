@@ -1,0 +1,57 @@
+{
+  "name": "Flip",
+  "subtitle": "Turn time over and it runs again.",
+  "start_sand": 60,
+  "allow_borrow": true,
+  "signs": [
+    "Glasses on pedestals hold doors open while their sand falls.",
+    "Press E to flip a glass.",
+    "Sand bridges hold only while their glass runs.",
+    "Flip a glass early and you only get back the sand that has fallen."
+  ],
+  "glasses": [
+    {
+      "capacity": 4,
+      "gates": [
+        0
+      ],
+      "bridges": []
+    },
+    {
+      "capacity": 5,
+      "gates": [
+        1
+      ],
+      "bridges": []
+    },
+    {
+      "capacity": 6,
+      "gates": [],
+      "bridges": [
+        0
+      ]
+    },
+    {
+      "capacity": 9,
+      "gates": [
+        2
+      ],
+      "bridges": []
+    },
+    {
+      "capacity": 3,
+      "gates": [
+        3
+      ],
+      "bridges": []
+    },
+    {
+      "capacity": 5,
+      "gates": [],
+      "bridges": [
+        1
+      ]
+    }
+  ],
+  "locks": []
+}

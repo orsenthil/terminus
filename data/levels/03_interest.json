@@ -1,0 +1,14 @@
+{
+  "name": "Interest",
+  "subtitle": "The longer you wait, the more you owe.",
+  "start_sand": 18,
+  "allow_borrow": true,
+  "signs": [
+    "Debt grows by 10% every 10 seconds. Watch the ring.",
+    "Borrow late. Borrow little.",
+    "Shrines remember you. Hold E at one to pay your debt with your own sand.",
+    "Better to arrive owing nothing."
+  ],
+  "glasses": [],
+  "locks": []
+}

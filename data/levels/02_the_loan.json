@@ -1,0 +1,14 @@
+{
+  "name": "The Loan",
+  "subtitle": "Time now. Pay later.",
+  "start_sand": 12,
+  "allow_borrow": true,
+  "signs": [
+    "You don't have the time to cross these ruins.",
+    "Hold LEFT SHIFT to borrow time from your future.",
+    "What you borrow, you owe. And something comes to collect.",
+    "Outrun it, or pay. Those are the only ways."
+  ],
+  "glasses": [],
+  "locks": []
+}
