@@ -10,7 +10,7 @@ LEVEL_IDS = sorted(f[:-4] for f in os.listdir(S.LEVELS_DIR) if f.endswith(".txt"
 
 def test_level_order_matches_files():
     assert sorted(S.LEVEL_ORDER) == LEVEL_IDS
-    assert len(LEVEL_IDS) == 6
+    assert len(LEVEL_IDS) == 5
 
 
 @pytest.mark.parametrize("level_id", LEVEL_IDS)
@@ -55,3 +55,8 @@ def test_missing_start_or_exit_is_an_error():
 def test_json_count_mismatch_is_an_error():
     with pytest.raises(LevelError):
         LevelData("t", ["PG.E", "####"], {"glasses": []})
+
+
+@pytest.mark.parametrize("level_id", LEVEL_IDS)
+def test_starting_sand_fits_in_the_hourglass(level_id):
+    assert load_level_data(level_id).start_sand <= S.LIFE_MAX

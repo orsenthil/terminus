@@ -1,4 +1,4 @@
-"""All tunable constants for Borrowed Time live here.
+"""All tunable constants for Terminus live here.
 
 Nothing in this module imports Panda3D, so the pure-logic modules and tests can use it.
 """
@@ -11,7 +11,7 @@ ASSETS_DIR = os.path.join(ROOT_DIR, "assets")
 LEVELS_DIR = os.path.join(ROOT_DIR, "data", "levels")
 
 # --- Window / debug ----------------------------------------------------------------------
-WINDOW_TITLE = "Borrowed Time"
+WINDOW_TITLE = "Terminus"
 WINDOW_SIZE = (1280, 720)
 DEBUG = bool(os.environ.get("BT_DEBUG"))
 
@@ -181,4 +181,4 @@ MUSIC_VOLUME = 0.7
 SFX_VOLUME = 0.9
 
 # --- Levels ------------------------------------------------------------------------------
-LEVEL_ORDER = ["01_sand", "02_the_loan", "03_interest", "04_flip", "05_measure", "06_settlement"]
+LEVEL_ORDER = ["01_sand", "02_the_loan", "03_interest", "04_flip", "05_measure"]

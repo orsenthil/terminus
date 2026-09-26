@@ -10,6 +10,8 @@ class Hourglass:
     def __init__(self, top=0.0, bottom=0.0, capacity=None):
         self.capacity = capacity
         self.top = max(0.0, float(top))
+        if capacity is not None:
+            self.top = min(self.top, capacity)
         self.bottom = max(0.0, float(bottom))
 
     @property

@@ -1,5 +1,7 @@
 # Music
 
+Step-by-step instructions for making these tracks are in [music.md](../../music.md).
+
 Drop files here named exactly as below. `.ogg` is preferred; a `.wav` with the same name
 also works. Missing files are fine: the game plays silence for that cue and prints one
 warning. No code changes are needed when adding files. Filenames are defined in
@@ -13,4 +15,4 @@ warning. No code changes are needed when adding files. Filenames are defined in
 | `collector_near.ogg` | Sting when the Collector gets within 5 tiles | No | 1-3 s. Sharp, eerie swell. |
 | `level_complete.ogg` | Sting on reaching a level's exit | No | 2-4 s. Bright, relieved. |
 | `game_over.ogg` | Sting on death | No | 2-4 s. Falling, hollow. |
-| `win.ogg` | Win screen after the final level | Yes | 1-2 min. Resolved, peaceful. |
+| `win.ogg` | "Free." screen after the final level (level 5) | Yes | 1-2 min. Resolved, peaceful. |

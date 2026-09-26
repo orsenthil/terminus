@@ -1,7 +1,6 @@
 """The sky behind every level: a clockwork world that follows the day / night cycle.
 
-Layers, far to near: stars, clock towers with faces that light up at night, huge slowly
-turning gears, and floating islands.
+Layers, far to near: stars, distant towers, huge slowly turning gears, and floating islands.
 Everything is procedural and unlit; colours follow the DayNight blend.
 """
 
@@ -10,7 +9,6 @@ import random
 
 from panda3d.core import TransparencyAttrib
 
-from game.daynight import lerp
 from game.render_util import MeshBuilder
 
 
@@ -89,7 +87,6 @@ class Backdrop:
 
         # Clock towers and floating hourglasses in the distance.
         towers = MeshBuilder("towers")
-        faces = MeshBuilder("tower_faces")
         stone = (0.42, 0.36, 0.5, 1)
         dark = (0.34, 0.29, 0.42, 1)
         x = -30.0
@@ -99,14 +96,12 @@ class Backdrop:
             towers.rect(x, -20, x + w, h, stone)
             towers.rect(x + w * 0.7, -20, x + w, h, dark)
             towers.flat_tri((x - 0.4, h), (x + w + 0.4, h), (x + w / 2, h + w * 1.1), dark)
-            flat_disc(faces, x + w / 2, h - w * 0.6, w * 0.34, (1.0, 0.92, 0.65, 1), -0.01, 20)
             x += w + rng.uniform(10, 26)
             if rng.random() < 0.6:  # a floating hourglass between towers
                 hx, hz = x - rng.uniform(4, 8), rng.uniform(9, 15)
                 towers.flat_tri((hx - 0.9, hz + 1.4), (hx + 0.9, hz + 1.4), (hx, hz), stone)
                 towers.flat_tri((hx - 0.9, hz - 1.4), (hx, hz), (hx + 0.9, hz - 1.4), stone)
         self.towers = self._layer(towers.node(), 0.8, 160)
-        self.faces = self._layer(faces.node(), 0.8, 159)
 
         # Giant turning gears.
         self.gear_layer = self.root.attachNewNode("gears")
@@ -160,7 +155,6 @@ class Backdrop:
         for np in (self.towers, self.gear_layer, self.islands):
             np.setColorScale(*scale)
         self.stars.setAlphaScale(n)
-        self.faces.setColorScale(*lerp((0.62, 0.55, 0.68, 1), (1.0, 0.95, 0.75, 1), n))
 
         for g, speed in self.gears:
             g.setR(t * speed)

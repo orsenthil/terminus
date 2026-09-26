@@ -1,7 +1,7 @@
 [project]
-name = "borrowed-time"
+name = "terminus"
 version = "0.1.0"
-description = "Borrowed Time - a PyWeek side-scrolling platformer about an hourglass life and the debt you take on to survive."
+description = "Terminus - a PyWeek platformer: borrow time to accomplish the task, then pay back the debt."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

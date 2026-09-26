@@ -1,40 +1,98 @@
 {
-  "name": "Measure",
-  "subtitle": "Seven, then eleven.",
-  "start_sand": 150,
+  "name": "Freedom",
+  "subtitle": "Measure the time. Repay the debt. Set yourself free.",
+  "start_sand": 99,
   "allow_borrow": true,
+  "exit_requires_no_debt": true,
   "signs": [
     "Locks open only if you measure their time. Follow the steps at the top of the screen.",
     "Start the lock, then stop it when its time is up. Within 1 second counts.",
-    "One glass after another adds up: 7 + 11 = 18."
+    "One glass after another adds up: 7 + 11 = 18.",
+    "The last door opens only if you owe no time. Repay at the shrine, then walk out free."
   ],
   "glasses": [
-    {"capacity": 7, "gates": [], "bridges": []},
-    {"capacity": 7, "gates": [], "bridges": []},
-    {"capacity": 11, "gates": [], "bridges": []}
+    {
+      "capacity": 7,
+      "gates": [],
+      "bridges": []
+    },
+    {
+      "capacity": 7,
+      "gates": [],
+      "bridges": []
+    },
+    {
+      "capacity": 11,
+      "gates": [],
+      "bridges": []
+    }
   ],
   "locks": [
     {
       "target": 7,
-      "gates": [0],
-      "glasses": [0],
+      "gates": [
+        0
+      ],
+      "glasses": [
+        0
+      ],
       "title": "Lock: measure 7 seconds using the 7s glass",
       "guide": [
-        {"text": "Flip the 7s glass (press E beside it).", "on": ["flip:0"]},
-        {"text": "Step to the lock and press E to START it.", "on": ["start"]},
-        {"text": "When the glass shows EMPTY!, press E on the lock to STOP it.", "on": ["stop"]}
+        {
+          "text": "Flip the 7s glass (press E beside it).",
+          "on": [
+            "flip:0"
+          ]
+        },
+        {
+          "text": "Step to the lock and press E to START it.",
+          "on": [
+            "start"
+          ]
+        },
+        {
+          "text": "When the glass shows EMPTY!, press E on the lock to STOP it.",
+          "on": [
+            "stop"
+          ]
+        }
       ]
     },
     {
       "target": 18,
-      "gates": [1],
-      "glasses": [1, 2],
+      "gates": [
+        1
+      ],
+      "glasses": [
+        1,
+        2
+      ],
       "title": "Lock: measure 18 seconds = 7s glass, then 11s glass",
       "guide": [
-        {"text": "Flip the 7s glass (on the left).", "on": ["flip:1"]},
-        {"text": "Press E on the lock to START it.", "on": ["start"]},
-        {"text": "When the 7s glass shows EMPTY!, flip the 11s glass (on the right).", "on": ["flip:2"]},
-        {"text": "When the 11s glass shows EMPTY!, press E on the lock to STOP it.", "on": ["stop"]}
+        {
+          "text": "Flip the 7s glass (on the left).",
+          "on": [
+            "flip:1"
+          ]
+        },
+        {
+          "text": "Press E on the lock to START it.",
+          "on": [
+            "start"
+          ]
+        },
+        {
+          "text": "When the 7s glass shows EMPTY!, flip the 11s glass (on the right).",
+          "on": [
+            "flip:2"
+          ]
+        },
+        {
+          "text": "When the 11s glass shows EMPTY!, press E on the lock to STOP it.",
+          "on": [
+            "stop"
+          ]
+        }
       ]
     }
   ]

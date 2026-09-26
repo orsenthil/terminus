@@ -93,7 +93,7 @@ class Game:
         self.scene = None
         self.accumulator = 0.0
         self.time = 0.0
-        base.taskMgr.add(self._task, "borrowed-time-main")
+        base.taskMgr.add(self._task, "terminus-main")
 
     def apply_daylight(self, daynight):
         """Sky colour and world lighting for the current point in the day / night cycle."""

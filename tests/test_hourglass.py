@@ -62,3 +62,7 @@ def test_fraction():
     g = Hourglass(top=3, bottom=1)
     assert g.fraction == pytest.approx(0.75)
     assert Hourglass().fraction == 0
+
+
+def test_starting_sand_is_clamped_to_capacity():
+    assert Hourglass(top=150, capacity=99).top == 99

@@ -60,7 +60,7 @@ def make_icon_image(size=ICON_SIZE):
 
 def icon_path():
     """Write the icon to the temp directory (every launch, so it never goes stale)."""
-    path = os.path.join(tempfile.gettempdir(), "borrowed_time_icon.png")
+    path = os.path.join(tempfile.gettempdir(), "terminus_icon.png")
     try:
         make_icon_image().write(Filename.fromOsSpecific(path))
     except OSError:

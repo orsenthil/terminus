@@ -13,7 +13,7 @@ from direct.showbase.DirectObject import DirectObject
 from panda3d.core import PointLight
 
 from game import settings as S
-from game.backdrop import Backdrop, flat_disc
+from game.backdrop import Backdrop
 from game.collector import Collector
 from game.daynight import DayNight
 from game.debt import Debt
@@ -24,7 +24,7 @@ from game.level import build_level_geometry, load_level_data
 from game.objects import Bridge, Exit, Gate, PedestalGlass, Pickup, Shrine, Sign, TimerLock
 from game.physics import TileGrid, aabb_overlap
 from game.player import PlayerController, PlayerView
-from game.render_util import MeshBuilder, make_card, make_hourglass_3d, make_text
+from game.render_util import make_card, make_hourglass_3d, make_text
 
 
 class Scene(DirectObject):
@@ -187,7 +187,11 @@ class TitleScene(Scene):
         self.glass.setPos(0, 0, 5.4)
         self.glass.setScale(2.4)
         self.text(S.WINDOW_TITLE, (0, 0.62), 0.17)
-        self.text("your life is an hourglass. you can borrow sand.", (0, 0.5), 0.05)
+        self.text(
+            "Borrow time to accomplish your task. Repay the debt, and set yourself free.",
+            (0, 0.5),
+            0.05,
+        )
         self.prompt = self.text("Press Space", (0, -0.62), 0.08)
         self.text(
             "Move: Arrows / A D    Jump: Space    Borrow: hold Shift    Interact: E"
@@ -250,8 +254,8 @@ class WinScene(Scene):
         self.glass.setPos(0, 0, 5.8)
         self.glass.setScale(1.6)
         st = self.game.stats
-        self.text("Settled.", (0, 0.62), 0.15, fg=S.GOLD)
-        self.text("You walked out owing nothing.", (0, 0.5), 0.06)
+        self.text("Free.", (0, 0.62), 0.15, fg=S.GOLD)
+        self.text("You repaid every borrowed second. Terminus lets you go.", (0, 0.5), 0.06)
         self.text(
             f"Time borrowed:  {st['borrowed']:.1f} s\n"
             f"Interest paid:  {st['interest_paid']:.1f} s\n"
@@ -343,21 +347,12 @@ class PlayScene(Scene):
         self.low_tint.setAlphaScale(0)
         self.low_time_warned = False
 
-        # At night the traveller carries a lantern: a point light plus a soft halo.
+        # At night the traveller carries a lantern that lights the platforms nearby.
         lantern = PointLight("lantern")
         lantern.setAttenuation(S.LANTERN_ATTENUATION)
         self.lantern = self.view.root.attachNewNode(lantern)
         self.lantern.setPos(0, -2.0, 0.8)
         base.render.setLight(self.lantern)
-        halo = MeshBuilder("lantern_halo")
-        flat_disc(halo, 0, 0.5, 2.2, (1.0, 0.8, 0.45, 0.16), 0.0, 24)
-        flat_disc(halo, 0, 0.5, 1.2, (1.0, 0.85, 0.5, 0.18), -0.01, 24)
-        self.halo = halo.node()
-        self.halo.reparentTo(self.view.root)
-        self.halo.setY(0.45)
-        self.halo.setLightOff()
-        self.halo.setTransparency(True)
-        self.halo.setDepthWrite(False)
         self.prompt = make_text(self.world, "", (0, -3, 0), 0.4, S.GOLD_GLOW)
 
         self.state = "play"
@@ -758,7 +753,9 @@ class PlayScene(Scene):
             if aabb_overlap(box, ex.box()):
                 if ex.requires_no_debt and self.debt.in_debt:
                     if self.hud.message_time <= 0:
-                        self.hud.show_message("The door will not open while you owe time.")
+                        self.hud.show_message(
+                            "The last door stays shut until your time debt is repaid."
+                        )
                 else:
                     self.complete()
                     return
@@ -793,7 +790,6 @@ class PlayScene(Scene):
         self.backdrop.update(self.t, self.cam_x, self.cam_z, h, dn)
         n = dn.night
         self.lantern.node().setColor(tuple(c * (0.1 + 1.1 * n) for c in S.LANTERN_COLOR[:3]) + (1,))
-        self.halo.setAlphaScale(n)
         sand = dn.sand()
         for gl in self.glasses:
             gl.sand.set_color(sand)

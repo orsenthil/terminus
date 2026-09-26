@@ -1,13 +1,18 @@
-# Borrowed Time
+# Terminus
 
 A PyWeek entry for the theme **"Borrowed Time"**.
 
-Your life is an hourglass that is always draining. You can borrow sand from your future to
-survive now, but the debt grows with interest, and something comes to collect it.
+> Terminus is the place where you can borrow time to accomplish a particular task. In the
+> end you repay the time debt back and set yourself free.
 
-A short 2.5D side-scrolling platformer in six levels, built with Python and Panda3D. It is
-set in a clockwork world: clock-face suns and moons, turning gears, and floating islands
-pouring sand. All geometry is generated in code; there are no image or model files.
+The name comes from Terminus, the planet at the edge of the galaxy in Isaac Asimov's
+*Foundation* stories. Your life is an hourglass that is always draining. To get through each
+task you can borrow sand from your future, but the debt grows with interest and something
+comes to collect it. The final door opens only when every borrowed second is repaid.
+
+A short 2.5D side-scrolling platformer in five levels, built with Python and Panda3D. It is
+set in a clockwork world of clock towers, turning gears and floating islands. All geometry
+is generated in code; there are no image or model files.
 
 ## Running the game
 
@@ -139,9 +144,15 @@ The level order is `LEVEL_ORDER` in `settings.py`.
 
 The game runs with no audio files at all. Each missing cue prints one warning and then
 stays silent. To add sound, drop correctly named `.ogg` files (or `.wav`) into
-`assets/music/` and `assets/sfx/`; no code changes are needed. The expected files are listed
-in [assets/music/README.md](assets/music/README.md) and
-[assets/sfx/README.md](assets/sfx/README.md).
+`assets/music/` and `assets/sfx/`; no code changes are needed. The expected files are
+listed in [assets/music/README.md](assets/music/README.md) and
+[assets/sfx/README.md](assets/sfx/README.md). For a step-by-step guide to making the music,
+see [music.md](music.md).
+
+**Quickest route:** `tools/make_audio.sh` synthesises all 23 sounds and music tracks with
+ffmpeg (no other tools, no samples) and writes them straight into `assets/`. The tracks
+are simple but complete, and you can edit the notes and formulas in the script and re-run
+it.
 
 `tools/make_placeholder_sfx.py` generates simple sine-wave **placeholder** beeps
 (`assets/sfx/*.wav`) using only the standard library. They exist only for testing sound
