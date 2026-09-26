@@ -1,7 +1,9 @@
 """ShowBase app: window setup, the single update task, and scene switching with fades."""
 
+import os
 import sys
 
+from direct.gui import DirectGuiGlobals as DGG
 from direct.showbase.DirectObject import DirectObject
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
@@ -13,6 +15,8 @@ from panda3d.core import (
     Filename,
     ModifierButtons,
     OrthographicLens,
+    SamplerState,
+    TextNode,
     loadPrcFileData,
 )
 
@@ -42,6 +46,30 @@ def configure(extra=""):
         {extra}
         """,
     )
+
+
+def load_game_font(base):
+    """Make Julius Sans One the default font for every TextNode, OnscreenText and DirectGUI
+    widget. Falls back to Panda3D's built-in font if the file is missing."""
+    if not os.path.isfile(S.FONT_PATH):
+        print(f"[font] missing {S.FONT_PATH}, using the default font")
+        return None
+    font = base.loader.loadFont(Filename.fromOsSpecific(S.FONT_PATH).getFullpath())
+    if font is None or not font.isValid():
+        return None
+    # Render glyphs large, then let mipmaps shrink them smoothly: thin strokes no longer
+    # break up into gaps at small sizes.
+    font.setPixelsPerUnit(120)
+    font.setPageSize(1024, 1024)
+    font.setMinfilter(SamplerState.FT_linear_mipmap_linear)
+    font.setMagfilter(SamplerState.FT_linear)
+    font.setAnisotropicDegree(4)
+    # Bold: an outline in the glyph's own colour (white, tinted per text) thickens every
+    # stroke. Contrast on a bright sky comes from each text's drop shadow instead.
+    font.setOutline((1, 1, 1, 1), S.FONT_BOLDNESS, 0.15)
+    TextNode.setDefaultFont(font)
+    DGG.setDefaultFont(font)
+    return font
 
 
 class Game:
@@ -80,6 +108,7 @@ class Game:
         self.fade_dir = -1  # fading in
         self.pending = None
 
+        self.font = load_game_font(base)
         self.audio = AudioManager(base)
         self.stats = {"borrowed": 0.0, "interest_paid": 0.0, "deaths": 0}
         self.buttons = {

@@ -1,4 +1,4 @@
-"""Cheap visual effects: pooled sand particles and camera shake."""
+"""Cheap visual effects: pooled particles (water, snow, steam, sulfur) and camera shake."""
 
 import math
 import random

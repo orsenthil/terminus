@@ -1,0 +1,17 @@
+{
+  "name": "Thaw",
+  "subtitle": "Welcome to Terminus. Every life here is a water clock.",
+  "start_time": 60,
+  "allow_borrow": false,
+  "signs": [
+    "Move with the arrow keys or A / D.",
+    "Jump with Space. Hold it longer to jump higher.",
+    "Your life is the water clock, top left. It never stops dripping.",
+    "Sulfur crystals are the only wealth on Terminus. Each one buys you time.",
+    "Burning sulfur pits are instant death.",
+    "Standing still costs time too. Keep moving.",
+    "Doorways lead on, across the islands."
+  ],
+  "glasses": [],
+  "locks": []
+}

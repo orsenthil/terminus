@@ -9,7 +9,7 @@ warning. No code changes are needed when adding files. Filenames are defined in
 
 | File | Used for | Loops? | Suggested length / mood |
 |------|----------|--------|-------------------------|
-| `title.ogg` | Title screen | Yes | 1-2 min. Calm, mysterious desert night; a slow ticking pulse. |
+| `title.ogg` | Title screen | Yes | 1-2 min. Calm, mysterious; a cold night at the edge of the galaxy, a slow dripping pulse. |
 | `level_calm.ogg` | Base gameplay layer, every level | Yes | 1-2 min. Warm, steady, forward-moving. |
 | `level_debt.ogg` | Layer played **in sync** with `level_calm`; volume rises with debt (silent at 0 debt, full at the cap) | Yes | **Exactly the same length and tempo as `level_calm.ogg`** so they stay aligned. Tense, dissonant, low strings/percussion that sit on top of the calm layer. |
 | `collector_near.ogg` | Sting when the Collector gets within 5 tiles | No | 1-3 s. Sharp, eerie swell. |

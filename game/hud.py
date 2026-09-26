@@ -1,4 +1,4 @@
-"""HUD on aspect2d: life hourglass, debt meter with interest ring, mute icon, messages."""
+"""HUD on aspect2d: life water clock, debt meter with interest ring, mute icon, messages."""
 
 import math
 
@@ -6,8 +6,8 @@ from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import TextNode, TransparencyAttrib
 
 from game import settings as S
-from game.objects import SandDisplay
-from game.render_util import MeshBuilder, make_card, make_ring
+from game.objects import WaterDisplay
+from game.render_util import MeshBuilder, make_card, make_ring, wide
 
 
 class HUD:
@@ -24,7 +24,7 @@ class HUD:
         mb = MeshBuilder("hud_glass")
         mb.flat_tri((-w, h), (w, h), (0, 0), (0.25, 0.3, 0.45, 0.8))
         mb.flat_tri((-w, -h), (0, 0), (w, -h), (0.25, 0.3, 0.45, 0.8))
-        wood = (0.55, 0.35, 0.18, 1)
+        wood = (0.42, 0.46, 0.56, 1)  # dark metal frame
         mb.rect(-w - 0.03, h, w + 0.03, h + 0.035, wood)
         mb.rect(-w - 0.03, -h - 0.035, w + 0.03, -h, wood)
         mb.rect(-w - 0.03, -h, -w - 0.015, h, wood)
@@ -33,7 +33,7 @@ class HUD:
         bg.setTransparency(TransparencyAttrib.MAlpha)
         bg.setTwoSided(True)
         bg.reparentTo(self.glass_root)
-        self.sand = SandDisplay(self.glass_root, w * 0.9, h * 0.92, S.GOLD, y=-0.01)
+        self.water = WaterDisplay(self.glass_root, w * 0.9, h * 0.92, S.WATER_DAY, y=-0.01)
         self.warn = 0.0
 
         # --- debt meter ---
@@ -50,7 +50,7 @@ class HUD:
             text="DEBT",
             parent=self.debt_root,
             pos=(0, 0.05),
-            scale=0.045,
+            scale=wide(0.052),
             fg=S.TEXT_COLOR,
             align=TextNode.ALeft,
             shadow=(0, 0, 0, 0.8),
@@ -60,7 +60,7 @@ class HUD:
             text="",
             parent=self.debt_root,
             pos=(0, -0.09),
-            scale=0.042,
+            scale=wide(0.05),
             fg=S.TEXT_COLOR,
             align=TextNode.ALeft,
             shadow=(0, 0, 0, 0.8),
@@ -105,7 +105,7 @@ class HUD:
             text="",
             parent=base.a2dTopRight,
             pos=(-0.22, -0.115),
-            scale=0.045,
+            scale=wide(0.052),
             fg=S.TEXT_COLOR,
             align=TextNode.ARight,
             shadow=(0, 0, 0, 0.8),
@@ -115,7 +115,7 @@ class HUD:
             text="",
             parent=base.a2dBottomCenter,
             pos=(0, 0.14),
-            scale=0.06,
+            scale=wide(0.06),
             fg=S.TEXT_COLOR,
             shadow=(0, 0, 0, 0.9),
             mayChange=True,
@@ -125,9 +125,13 @@ class HUD:
 
         # Step-by-step guide panel (top centre) for puzzles such as timer locks.
         self.guide_root = base.a2dTopCenter.attachNewNode("hud_guide")
-        self.guide_root.setPos(0.1, 0, -0.1)
+        # Sits between the debt meter (left) and the level name (right).
+        self.guide_root.setPos(0.16, 0, -0.1)
         self.nodes.append(self.guide_root)
-        self.guide_bg = make_card(-0.78, -0.1, 0.78, 0.02, (0.05, 0.03, 0.08, 0.8))
+        self.guide_half_w = 0.82
+        self.guide_bg = make_card(
+            -self.guide_half_w, -0.1, self.guide_half_w, 0.02, (0.05, 0.03, 0.08, 0.8)
+        )
         self.guide_bg.reparentTo(self.guide_root)
         self.guide_lines = []
         self.guide_key = None
@@ -144,9 +148,10 @@ class HUD:
             self.waves.show()
             self.cross.hide()
 
-    def set_guide(self, title, steps, current):
-        """Show a numbered list of steps with `current` highlighted; title=None hides it."""
-        key = (title, tuple(steps), current)
+    def set_guide(self, title, steps, current, footer=""):
+        """Show a puzzle panel: the title, then (optionally) numbered steps with `current`
+        highlighted, then a footer line. title=None hides the panel."""
+        key = (title, tuple(steps), current, footer)
         if key == self.guide_key:
             return
         self.guide_key = key
@@ -160,26 +165,30 @@ class HUD:
         rows = [(title, S.GOLD, 0.05)]
         for i, step in enumerate(steps):
             if i < current:
-                rows.append((f"{i + 1}. {step}   (done)", (0.6, 0.6, 0.6, 1), 0.042))
+                rows.append((f"{i + 1}. {step}   (done)", (0.6, 0.6, 0.6, 1), 0.046))
             elif i == current:
                 rows.append((f">> {i + 1}. {step}", (1.0, 0.95, 0.6, 1), 0.046))
             else:
-                rows.append((f"{i + 1}. {step}", S.TEXT_COLOR, 0.042))
+                rows.append((f"{i + 1}. {step}", S.TEXT_COLOR, 0.046))
+        if footer:
+            rows.append((footer, (0.75, 0.75, 0.85, 1), 0.044))
+        # Each line wraps to the panel's width, so long hints never spill out of it.
+        inner = 2 * self.guide_half_w - 0.08
         z = -0.04
         for text, color, scale in rows:
-            self.guide_lines.append(
-                OnscreenText(
-                    text=text,
-                    parent=self.guide_root,
-                    pos=(-0.74, z),
-                    scale=scale,
-                    fg=color,
-                    align=TextNode.ALeft,
-                    shadow=(0, 0, 0, 0.9),
-                )
+            line = OnscreenText(
+                text=text,
+                parent=self.guide_root,
+                pos=(-self.guide_half_w + 0.04, z),
+                scale=wide(scale),
+                fg=color,
+                align=TextNode.ALeft,
+                shadow=(0, 0, 0, 0.9),
+                wordwrap=inner / (scale * S.TEXT_WIDTH),
             )
-            z -= 0.065
-        height = 0.065 * len(rows) + 0.04
+            self.guide_lines.append(line)
+            z -= 0.072 + 0.06 * (line.textNode.getNumRows() - 1)
+        height = -z + 0.02
         self.guide_bg.setSz(height / 0.12)
         self.guide_bg.setZ(0.02 - 0.02 * height / 0.12)
 
@@ -192,7 +201,7 @@ class HUD:
             text="+10%",
             parent=self.debt_root,
             pos=(self.bar_w - 0.05, 0.05),
-            scale=0.06,
+            scale=wide(0.06),
             fg=(1.0, 0.4, 0.2, 1),
             shadow=(0, 0, 0, 0.9),
             mayChange=True,
@@ -202,7 +211,7 @@ class HUD:
     def update(self, dt, t, life, debt, borrowing):
         total = life.top + life.bottom
         top_frac = life.top / total if total > 0 else 0.0
-        self.sand.set_fill(top_frac, 1.0 - top_frac if total > 0 else 0.0, not life.empty)
+        self.water.set_fill(top_frac, 1.0 - top_frac if total > 0 else 0.0, not life.empty)
         if life.top < 10.0 and not life.empty:
             p = 0.5 + 0.5 * math.sin(t * (10 if life.top < 5 else 6))
             self.glass_root.setColorScale(1.0, 0.6 + 0.4 * p, 0.6 + 0.4 * p, 1)

@@ -20,7 +20,7 @@ def test_level_parses_with_one_start_and_an_exit(level_id):
     assert text.count("P") == 1
     assert text.count("E") >= 1
     assert data.name
-    assert data.start_sand > 0
+    assert data.start_time > 0
 
 
 @pytest.mark.parametrize("level_id", LEVEL_IDS)
@@ -58,5 +58,5 @@ def test_json_count_mismatch_is_an_error():
 
 
 @pytest.mark.parametrize("level_id", LEVEL_IDS)
-def test_starting_sand_fits_in_the_hourglass(level_id):
-    assert load_level_data(level_id).start_sand <= S.LIFE_MAX
+def test_starting_time_fits_in_the_clock(level_id):
+    assert load_level_data(level_id).start_time <= S.LIFE_MAX

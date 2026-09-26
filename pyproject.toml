@@ -1,6 +1,6 @@
 [project]
 name = "terminus"
-version = "0.1.0"
+version = "1.0.0"
 description = "Terminus - a PyWeek platformer: borrow time to accomplish the task, then pay back the debt."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -11,6 +11,11 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest",
+]
+# For standalone builds: uv run --group build python setup.py bdist_apps
+build = [
+    "setuptools",
+    "pip",
 ]
 
 [tool.uv]

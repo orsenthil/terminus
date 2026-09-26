@@ -142,7 +142,7 @@ gen "$S/lock_fail.wav" 0.45 "0.25*(sgn(sin(2*PI*110*t))+sgn(sin(2*PI*116*t)))*ex
 gen "$S/shrine_pour_loop.wav" 1.0 "0.26*(2*random(0)-1)*(0.75+0.25*sin(2*PI*6*t))+0.06*sin(2*PI*880*t)*(0.5+0.5*sin(2*PI*2*t))"
 # collector_hit: cold heavy impact with an echo
 gen "$S/collector_hit.wav" 0.7 "0.8*sin(2*PI*(35*t+(80/10)*(1-exp(-10*t))))*exp(-5*t)+0.3*(sin(2*PI*233*t)+sin(2*PI*247*t))*exp(-6*t)" "aecho=0.8:0.6:120:0.4"
-# death: long falling chirp scattering into sand
+# death: long falling chirp scattering into spray
 gen "$S/death.wav" 0.9 "0.4*sin(2*PI*(600*t-(520/1.8)*t*t))*exp(-3*t)+0.2*(2*random(0)-1)*exp(-5*t)"
 # menu_move: tiny tick
 gen "$S/menu_move.wav" 0.05 "0.35*sin(2*PI*1200*t)*exp(-60*t)"

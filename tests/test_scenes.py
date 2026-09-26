@@ -74,7 +74,8 @@ def test_transitions_do_not_leak(game):
 
 
 def test_measure_level_guide_leads_to_solution(game):
-    """Following level 5's on-screen steps (with sloppy human timing) opens both locks."""
+    """Level 5's locks open with the intended method (sloppy human timing), and the
+    step-by-step hint only appears when H is pressed."""
     base = game.base
     game.change_scene(lambda: scenes.PlayScene(game, 4))
     settle(game)
@@ -102,27 +103,95 @@ def test_measure_level_guide_leads_to_solution(game):
     press_e()
     assert sc.locks[0].logic.solved
 
-    # Lock 1: 18 seconds = the 7s glass, then the 11s glass.
+    # Lock 1: 15 seconds with the 7s and 11s glasses. Only the problem shows until H.
+    at(32.5)
+    run(game, 1)
+    assert sc.hud.guide_key[0].startswith("Lock: measure 15 seconds")
+    assert sc.hud.guide_key[1] == ()  # no steps visible
+    base.messenger.send("h")
+    run(game, 1)
+    assert len(sc.hud.guide_key[1]) == 4  # the hint's steps are visible
+    base.messenger.send("h")
+    run(game, 1)
+    assert sc.hud.guide_key[1] == ()
+    at(34.5)
+    press_e()  # flip the 11s
+    wait(0.4)
     at(30.5)
     press_e()  # flip the 7s
     assert sc.guide_progress[1][0] == 1
-    wait(0.3)
     at(32.5)
-    press_e()  # start the lock
-    assert sc.guide_progress[1][0] == 2
     while sc.glasses[1].running:
         run(game, 1)
     wait(0.3)
+    press_e()  # start when the 7s empties
+    assert sc.guide_progress[1][0] == 2
+    while sc.glasses[2].running:
+        run(game, 1)
+    wait(0.3)
     at(34.5)
-    press_e()  # flip the 11s
+    press_e()  # re-flip the 11s when it empties (4 s later)
     assert sc.guide_progress[1][0] == 3
     at(32.5)
     while sc.glasses[2].running:
         run(game, 1)
     wait(0.3)
-    press_e()  # stop the lock
+    press_e()  # stop when it empties again: 4 + 11 = 15
     assert sc.locks[1].logic.solved
     run(game, 2)
     assert all(g.open for g in sc.gates)
     game.change_scene(lambda: scenes.TitleScene(game))
     settle(game)
+
+
+def test_intro_pages_lead_to_the_first_level(game):
+    base = game.base
+    game.change_scene(lambda: scenes.TitleScene(game))
+    settle(game)
+    baseline = snapshot(base)
+    base.messenger.send("space")
+    settle(game)
+    intro = game.scene
+    assert isinstance(intro, scenes.IntroScene)
+    for page in range(len(scenes.INTRO_PAGES)):
+        assert intro.page == page
+        base.messenger.send("space")
+        run(game, 2)
+    settle(game)
+    assert isinstance(game.scene, scenes.LevelIntroScene)
+    assert game.scene.index == 0
+    # Esc skips the intro straight to level 1.
+    game.change_scene(lambda: scenes.IntroScene(game))
+    settle(game)
+    base.messenger.send("escape")
+    settle(game)
+    assert isinstance(game.scene, scenes.LevelIntroScene)
+    game.change_scene(lambda: scenes.TitleScene(game))
+    settle(game)
+    assert snapshot(base) == baseline
+
+
+def test_credits_roll_to_the_end_and_return_to_title(game):
+    base = game.base
+    game.change_scene(lambda: scenes.TitleScene(game))
+    settle(game)
+    baseline = snapshot(base)
+    base.messenger.send("c")
+    settle(game)
+    credits = game.scene
+    assert isinstance(credits, scenes.CreditsScene)
+    # Let the whole roll play out: it returns to the title on its own.
+    seconds = (2.3 + credits.length) / scenes.S.CREDITS_SCROLL_SPEED + 2
+    run(game, int(seconds * 60))
+    settle(game)
+    assert isinstance(game.scene, scenes.TitleScene)
+    # From the win screen, Space rolls the credits; Space again skips them.
+    game.change_scene(lambda: scenes.WinScene(game))
+    settle(game)
+    base.messenger.send("space")
+    settle(game)
+    assert isinstance(game.scene, scenes.CreditsScene)
+    base.messenger.send("space")
+    settle(game)
+    assert isinstance(game.scene, scenes.TitleScene)
+    assert snapshot(base) == baseline

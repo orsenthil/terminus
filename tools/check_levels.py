@@ -2,7 +2,7 @@
 
 Searches over standing positions with a small set of moves (walk, hop, jumps of several
 heights, with and without a running start) and reports the fastest route time. Gates are
-treated as open and sand bridges as solid, i.e. "reachable once the puzzles are solved".
+treated as open and ice bridges as solid, i.e. "reachable once the puzzles are solved".
 
     uv run python tools/check_levels.py [level_id ...]
 """
@@ -33,7 +33,7 @@ def dead(body, data):
     if body.z < -3:
         return True
     box = (body.left, body.z, body.right, body.top)
-    return any(aabb_overlap(box, (ix, iz, ix + 1, iz + S.SPIKE_HEIGHT)) for ix, iz in data.spikes)
+    return any(aabb_overlap(box, (ix, iz, ix + 1, iz + S.PIT_HEIGHT)) for ix, iz in data.pits)
 
 
 def at_exit(body, data):

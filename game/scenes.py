@@ -10,7 +10,7 @@ from direct.gui import DirectGuiGlobals as DGG
 from direct.gui.DirectGui import DirectButton, DirectFrame
 from direct.gui.OnscreenText import OnscreenText
 from direct.showbase.DirectObject import DirectObject
-from panda3d.core import PointLight
+from panda3d.core import PointLight, TextNode
 
 from game import settings as S
 from game.backdrop import Backdrop
@@ -20,11 +20,21 @@ from game.debt import Debt
 from game.effects import Particles, Shake
 from game.hourglass import Hourglass
 from game.hud import HUD
-from game.level import build_level_geometry, load_level_data
-from game.objects import Bridge, Exit, Gate, PedestalGlass, Pickup, Shrine, Sign, TimerLock
+from game.level import build_level_geometry, find_vents, load_level_data
+from game.objects import (
+    Archive,
+    Bridge,
+    Exit,
+    Gate,
+    PedestalGlass,
+    Pickup,
+    PitFlames,
+    Sign,
+    TimerLock,
+)
 from game.physics import TileGrid, aabb_overlap
 from game.player import PlayerController, PlayerView
-from game.render_util import make_card, make_hourglass_3d, make_text
+from game.render_util import make_card, make_hourglass_3d, make_text, wide
 
 
 class Scene(DirectObject):
@@ -79,7 +89,7 @@ class Scene(DirectObject):
         t = OnscreenText(
             text=text,
             pos=pos,
-            scale=scale,
+            scale=wide(scale),
             fg=fg,
             shadow=(0, 0, 0, 0.9),
             parent=parent if parent is not None else self.base.aspect2d,
@@ -106,6 +116,7 @@ class Menu:
                 parent=parent,
                 text=label,
                 scale=0.07,
+                text_scale=(S.TEXT_WIDTH, 1),
                 pos=(0, 0, top - i * spacing),
                 frameSize=(-5, 5, -0.6, 1.1),
                 relief=DGG.FLAT,
@@ -193,27 +204,123 @@ class TitleScene(Scene):
             0.05,
         )
         self.prompt = self.text("Press Space", (0, -0.62), 0.08)
+        self.text("C: Credits", (0, -0.74), 0.045, fg=(0.8, 0.8, 0.9, 1))
         self.text(
             "Move: Arrows / A D    Jump: Space    Borrow: hold Shift    Interact: E"
-            "    Restart: R    Mute: M    Pause: Esc",
+            "    Hint: H    Restart: R    Mute: M    Pause: Esc",
             (0, -0.9),
-            0.038,
+            0.042,
         )
         self.bind("confirm", self.start_game)
+        self.bind("credits", self.show_credits)
         self.bind("pause", self.game.quit)
         self.audio.play_music("title")
+
+    def show_credits(self):
+        self.audio.play_sfx("menu_select")
+        self.game.change_scene(lambda: CreditsScene(self.game))
 
     def start_game(self):
         self.audio.play_sfx("menu_select")
         self.game.stats = {"borrowed": 0.0, "interest_paid": 0.0, "deaths": 0}
+        self.game.change_scene(lambda: IntroScene(self.game))
+
+    def update(self, dt):
+        super().update(dt)
+        self.sky.update(dt, self.t)
+        self.glass.find("**/hourglass_water").setColor(*self.sky.daynight.water())
+        self.glass.setH(self.t * 25)
+        self.glass.setR(8 * math.sin(self.t * 0.7))
+        self.prompt.setAlphaScale(0.55 + 0.45 * math.sin(self.t * 3))
+
+
+# ---------------------------------------------------------------------------------------
+INTRO_PAGES = [
+    (
+        "Terminus",
+        "At the very edge of the galaxy, where the stars grow thin, a single world circles "
+        "a dim red sun.",
+    ),
+    (
+        "A world of ice and dark rock",
+        "Terminus is cold and barren, scattered with thousands of islands. Its days are "
+        "short and its nights are long, and four moons cross its sky without ever lining up.",
+    ),
+    (
+        "The colony",
+        "Out here a small colony keeps the knowledge of the galaxy safe in its Archives. The "
+        "rock is poor; its only wealth is sulfur.",
+    ),
+    (
+        "Borrowed time",
+        "Terminus holds one more secret: here, time can be borrowed. Your life is a water "
+        "clock, and it is always running out.",
+    ),
+    (
+        "Your task",
+        "Cross the islands to the last door. Borrow time when you must, but every borrowed "
+        "second is a debt, and something comes to collect it. Repay it at the Archives. Owe "
+        "nothing, and Terminus sets you free.",
+    ),
+]
+
+
+def _wrap_words(text, width):
+    lines, line = [], ""
+    for word in text.split():
+        if line and len(line) + 1 + len(word) > width:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    return "\n".join(lines + ([line] if line else []))
+
+
+class IntroScene(Scene):
+    """A few pages about Terminus and the goal, over its sky as day turns to night."""
+
+    def enter(self):
+        self.sky = MenuBackdrop(self, DayNight(day=7, night=12, fade=2.5, time=1.0))
+        panel = make_card(-1.0, -0.42, 1.0, 0.42, (0.03, 0.03, 0.08, 0.62), "intro_panel")
+        self.node(panel).reparentTo(self.base.aspect2d)
+        self.heading = self.text("", (0, 0.22), 0.1, fg=S.GOLD)
+        self.body = self.text("", (0, 0.07), 0.058)
+        self.pager = self.text("", (0, -0.34), 0.04, fg=(0.75, 0.75, 0.85, 1))
+        self.prompt = self.text("Space: continue      Esc: skip", (0, -0.9), 0.045)
+        self.page = -1
+        self.page_t = 0.0
+        self.bind("confirm", self.next_page)
+        self.bind("pause", self.skip)
+        self.audio.play_music("title")
+        self.next_page()
+
+    def next_page(self):
+        if self.page >= len(INTRO_PAGES) - 1:
+            self.skip()
+            return
+        if self.page >= 0:
+            self.audio.play_sfx("menu_move")
+        self.page += 1
+        self.page_t = 0.0
+        heading, body = INTRO_PAGES[self.page]
+        self.heading.setText(heading)
+        self.body.setText(_wrap_words(body, 52))
+        self.pager.setText(f"{self.page + 1} / {len(INTRO_PAGES)}")
+        last = self.page == len(INTRO_PAGES) - 1
+        self.prompt.setText("Space: begin" if last else "Space: continue      Esc: skip")
+
+    def skip(self):
+        self.audio.play_sfx("menu_select")
+        self.ignoreAll()
         self.game.change_scene(lambda: LevelIntroScene(self.game, 0))
 
     def update(self, dt):
         super().update(dt)
         self.sky.update(dt, self.t)
-        self.glass.find("**/hourglass_sand").setColor(*self.sky.daynight.sand())
-        self.glass.setH(self.t * 25)
-        self.glass.setR(8 * math.sin(self.t * 0.7))
+        self.page_t += dt
+        fade = min(1.0, self.page_t * 2.5)
+        for t in (self.heading, self.body, self.pager):
+            t.setAlphaScale(fade)
         self.prompt.setAlphaScale(0.55 + 0.45 * math.sin(self.t * 3))
 
 
@@ -268,12 +375,12 @@ class WinScene(Scene):
         self.audio.play_music("win")
 
     def back(self):
-        self.game.change_scene(lambda: TitleScene(self.game))
+        self.game.change_scene(lambda: CreditsScene(self.game))
 
     def update(self, dt):
         super().update(dt)
         self.sky.update(dt, self.t)
-        self.glass.find("**/hourglass_sand").setColor(*self.sky.daynight.sand())
+        self.glass.find("**/hourglass_water").setColor(*self.sky.daynight.water())
         self.glass.setH(self.t * 15)
         self.prompt.setAlphaScale(0.55 + 0.45 * math.sin(self.t * 3))
 
@@ -295,7 +402,7 @@ class PlayScene(Scene):
         self.grid = TileGrid(data.width, data.height, data.solid)
 
         self.pickups = [Pickup(self.world, t) for t in data.pickups]
-        self.shrines = [Shrine(self.world, t) for t in data.shrines]
+        self.archives = [Archive(self.world, t) for t in data.archives]
         self.gates = [Gate(self.world, tiles, self.grid) for tiles in data.gates]
         self.bridges = [Bridge(self.world, tiles, self.grid) for tiles in data.bridges]
         self.glasses = [
@@ -326,8 +433,13 @@ class PlayScene(Scene):
         self.view = PlayerView(self.world)
         self.collector = Collector(self.world)
         self.particles = Particles(self.world)
+        self.vents = find_vents(data)
+        self.pit_flames = PitFlames(self.world, data.pits)
+        self.spark_acc = 0.0
+        self.snow_acc = 0.0
+        self.steam_acc = 0.0
         self.shake = Shake()
-        self.life = Hourglass(top=data.start_sand, capacity=S.LIFE_MAX)
+        self.life = Hourglass(top=data.start_time, capacity=S.LIFE_MAX)
         self.debt = Debt()
         self.checkpoint = self._snapshot(sx + 0.5, sz)
         self.collected_since_checkpoint = []
@@ -376,6 +488,8 @@ class PlayScene(Scene):
         self.bind("menu_up", self.on_menu, -1)
         self.bind("menu_down", self.on_menu, 1)
         self.bind("confirm", self.on_confirm)
+        self.bind("hint", self.on_hint)
+        self.show_hint = False
         self.audio.play_music("level_calm")
         self.update(0.0)
 
@@ -404,7 +518,7 @@ class PlayScene(Scene):
     def respawn(self):
         cp = self.checkpoint
         self.player.teleport(cp["x"], cp["z"])
-        floor = min(15.0, self.data.start_sand)
+        floor = min(15.0, self.data.start_time)
         self.life = Hourglass(top=max(cp["life"], floor), capacity=S.LIFE_MAX)
         self.debt.restore(cp["debt"])
         self.collector.vanish()
@@ -433,7 +547,7 @@ class PlayScene(Scene):
         if isinstance(target, PedestalGlass):
             target.flip()
             self.audio.play_sfx("flip_glass")
-            self.particles.emit(target.x, target.z + 1.4, 10, S.GOLD, speed=2.5)
+            self.particles.emit(target.x, target.z + 1.4, 10, self.game.daynight.water(), speed=2.5)
             self._guide_event(f"flip:{self.glasses.index(target)}")
         elif isinstance(target, TimerLock):
             result = target.logic.interact()
@@ -486,6 +600,11 @@ class PlayScene(Scene):
                     best = (lock, progress)
         return best
 
+    def on_hint(self):
+        if self.state == "play" and self._active_guide() is not None:
+            self.show_hint = not self.show_hint
+            self.audio.play_sfx("menu_move")
+
     def on_pause(self):
         if self.state == "play":
             self.state = "paused"
@@ -525,7 +644,9 @@ class PlayScene(Scene):
         self.pause_frame = DirectFrame(
             frameColor=(0.02, 0.02, 0.06, 0.75), frameSize=(-0.6, 0.6, -0.55, 0.62)
         )
-        OnscreenText(text="Paused", parent=self.pause_frame, pos=(0, 0.42), scale=0.1, fg=S.GOLD)
+        OnscreenText(
+            text="Paused", parent=self.pause_frame, pos=(0, 0.42), scale=wide(0.1), fg=S.GOLD
+        )
         self.menu = Menu(
             self,
             self.pause_frame,
@@ -569,7 +690,7 @@ class PlayScene(Scene):
         self.game.stats["deaths"] += 1
         b = self.player.body
         self.view.hide()
-        self.particles.emit(b.x, b.z + 0.5, 40, S.GOLD, speed=6, life=1.0)
+        self.particles.emit(b.x, b.z + 0.5, 40, self.game.daynight.water(), speed=6, life=1.0)
         self.shake.add(0.5)
         self.audio.stop_loop("borrow_loop")
         self.audio.stop_loop("shrine_pour_loop")
@@ -579,13 +700,15 @@ class PlayScene(Scene):
         self.dead_frame = DirectFrame(
             frameColor=(0.05, 0.0, 0.02, 0.7), frameSize=(-3, 3, -0.3, 0.35)
         )
-        OnscreenText(text=reason, parent=self.dead_frame, pos=(0, 0.12), scale=0.11, fg=S.GOLD)
-        where = "the last shrine" if self.checkpoint.get("shrine") else "the start"
+        OnscreenText(
+            text=reason, parent=self.dead_frame, pos=(0, 0.12), scale=wide(0.11), fg=S.GOLD
+        )
+        where = "the last Archive" if self.checkpoint.get("archive") else "the start"
         OnscreenText(
             text=f"Space: try again from {where}      R: restart level",
             parent=self.dead_frame,
             pos=(0, -0.1),
-            scale=0.055,
+            scale=wide(0.055),
             fg=S.TEXT_COLOR,
         )
 
@@ -651,16 +774,16 @@ class PlayScene(Scene):
         if "land" in events:
             self.audio.play_sfx("land")
             self.view.kick(S.SQUASH_AMOUNT)
-            self.particles.emit(b.x, b.z + 0.05, 6, S.SAND_TOP, speed=2.0, spread=1.2, life=0.35)
+            self.particles.emit(b.x, b.z + 0.05, 6, S.SNOW, speed=2.0, spread=1.2, life=0.35)
 
         # Hazards
         box = self._player_box()
         if b.z < -2.0:
-            self.die("Lost to the dunes")
+            self.die("Lost to the frozen sea")
             return
-        for ix, iz in self.data.spikes:
-            if aabb_overlap(box, (ix + 0.15, iz, ix + 0.85, iz + S.SPIKE_HEIGHT)):
-                self.die("Impaled on the spikes")
+        for ix, iz in self.data.pits:
+            if aabb_overlap(box, (ix + 0.15, iz, ix + 0.85, iz + S.PIT_HEIGHT)):
+                self.die("Burned in a sulfur pit")
                 return
 
         # Pickups
@@ -668,27 +791,27 @@ class PlayScene(Scene):
             if not p.collected and abs(p.x - b.x) < S.PICKUP_RADIUS and abs(p.z - b.z) < 0.9:
                 p.set_collected(True)
                 self.collected_since_checkpoint.append(p)
-                self.life.add(S.PICKUP_SAND)
+                self.life.add(S.PICKUP_TIME)
                 self.audio.play_sfx("pickup")
-                self.particles.emit(p.x, p.z + 0.3, 14, S.GOLD_GLOW, speed=3.5)
+                self.particles.emit(p.x, p.z + 0.3, 14, S.SULFUR_GLOW, speed=3.5)
 
-        # Shrines: checkpoint + pour sand into debt while E is held
+        # Archives: checkpoint + pour time into debt while E is held
         self.pouring = False
-        for s in self.shrines:
+        for s in self.archives:
             s.pouring = False
             if not s.near(b.x, b.z):
                 continue
             if not s.active:
-                for other in self.shrines:
+                for other in self.archives:
                     other.set_active(False)
                 s.set_active(True)
                 self.checkpoint = self._snapshot(s.x, s.z)
-                self.checkpoint["shrine"] = True
+                self.checkpoint["archive"] = True
                 self.collected_since_checkpoint = []
-                self.hud.show_message("The shrine will remember you.")
+                self.hud.show_message("The Archive will remember you.")
             if g.held("interact") and self.debt.in_debt:
-                spare = self.life.top - S.SHRINE_MIN_LIFE
-                amount = min(S.SHRINE_POUR_RATE * dt, spare, self.debt.total)
+                spare = self.life.top - S.ARCHIVE_MIN_LIFE
+                amount = min(S.ARCHIVE_POUR_RATE * dt, spare, self.debt.total)
                 if amount > 0:
                     self.life.remove(amount)
                     self.debt.repay(amount)
@@ -697,7 +820,7 @@ class PlayScene(Scene):
                         self.hud.show_message("Debt settled.")
                     # Keep the checkpoint's debt in step with what was just paid.
                     self.checkpoint = self._snapshot(s.x, s.z)
-                    self.checkpoint["shrine"] = True
+                    self.checkpoint["archive"] = True
 
         # Glasses drive gates and bridges; solved locks hold their gates open.
         for i, gl in enumerate(self.glasses):
@@ -760,6 +883,65 @@ class PlayScene(Scene):
                     self.complete()
                     return
 
+    def _weather(self, dt):
+        """Snow drifting across the view, and steam rising from the sulfur vents."""
+        w, h = self.game.view_size()
+        rng = self.particles.rng
+        self.snow_acc += dt * S.SNOWFALL_RATE
+        while self.snow_acc >= 1.0:
+            self.snow_acc -= 1.0
+            x = self.cam_x + rng.uniform(-w / 2 - 3, w / 2 + 3)
+            self.particles.emit(
+                x,
+                self.cam_z + h / 2 + 0.5,
+                1,
+                S.SNOW,
+                speed=1.6,
+                spread=0.35,
+                angle=-math.pi / 2 - 0.25,
+                life=h / 1.3,
+                gravity=0.0,
+                y=-1.4,
+                jitter=0.0,
+            )
+        self.pit_flames.update(self.t, self.cam_x, w / 2)
+        # Now and then a blue spark leaps from a pit on screen.
+        self.spark_acc += dt * 6.0
+        while self.spark_acc >= 1.0:
+            self.spark_acc -= 1.0
+            visible = [p for p in self.data.pits if abs(p[0] + 0.5 - self.cam_x) < w / 2]
+            if visible:
+                px, pz = rng.choice(visible)
+                self.particles.emit(
+                    px + rng.uniform(0.1, 0.9),
+                    pz + 0.3,
+                    1,
+                    S.PIT_FLAME_CORE,
+                    speed=2.5,
+                    spread=0.4,
+                    life=0.6,
+                    gravity=4.0,
+                    y=-0.6,
+                    jitter=0.05,
+                )
+        self.steam_acc += dt * S.VENT_STEAM_RATE
+        while self.steam_acc >= 1.0:
+            self.steam_acc -= 1.0
+            for vx, vz in self.vents:
+                if abs(vx + 0.5 - self.cam_x) < w / 2 + 2:
+                    self.particles.emit(
+                        vx + 0.5,
+                        vz + 0.05,
+                        1,
+                        S.STEAM,
+                        speed=1.0,
+                        spread=0.3,
+                        life=1.8,
+                        gravity=-0.8,
+                        y=-0.7,
+                        jitter=0.15,
+                    )
+
     # --- per frame -------------------------------------------------------------------
     def _clamp_cam(self, x, z):
         w, h = self.game.view_size()
@@ -790,18 +972,18 @@ class PlayScene(Scene):
         self.backdrop.update(self.t, self.cam_x, self.cam_z, h, dn)
         n = dn.night
         self.lantern.node().setColor(tuple(c * (0.1 + 1.1 * n) for c in S.LANTERN_COLOR[:3]) + (1,))
-        sand = dn.sand()
+        water = dn.water()
         for gl in self.glasses:
-            gl.sand.set_color(sand)
-        for s in self.shrines:
-            s.sand.set_color(sand)
-        self.hud.sand.set_color(sand)
+            gl.water.set_color(water)
+        for s in self.archives:
+            s.water.set_color(water)
+        self.hud.water.set_color(water)
 
         # Visuals
         self.view.update(dt, self.player)
         for p in self.pickups:
             p.update(dt, self.t)
-        for s in self.shrines:
+        for s in self.archives:
             s.update(dt, self.t)
         for gate in self.gates:
             gate.update(dt)
@@ -819,10 +1001,11 @@ class PlayScene(Scene):
                 self.particles.emit_toward(
                     self.cam_x - 12, self.cam_z + 6, b.x, b.z + 0.5, 2, S.DEBT_RED
                 )
-                self.particles.emit_toward(b.x, b.z + 1.8, b.x, b.z + 0.5, 1, sand)
+                self.particles.emit_toward(b.x, b.z + 1.8, b.x, b.z + 0.5, 1, water)
             if self.pouring:
-                shrine = next(s for s in self.shrines if s.pouring)
-                self.particles.emit_toward(b.x, b.z + 0.6, shrine.x, shrine.z + 1.6, 2)
+                archive = next(s for s in self.archives if s.pouring)
+                self.particles.emit_toward(b.x, b.z + 0.6, archive.x, archive.z + 1.6, 2, water)
+        self._weather(dt)
         self.particles.update(dt)
 
         # Audio loops follow held actions; the debt layer follows the debt.
@@ -835,7 +1018,7 @@ class PlayScene(Scene):
         self.audio.set_layer_volume("level_debt", debt_frac)
         self.tint.setAlphaScale(debt_frac * S.DEBT_TINT_MAX_ALPHA)
 
-        # Low on time: everything turns red, pulsing faster as the sand runs out.
+        # Low on time: everything turns red, pulsing faster as the water runs out.
         low = 0.0
         if self.state == "play":
             low = max(0.0, min(1.0, (S.LOW_TIME - self.life.top) / (S.LOW_TIME - 3.0)))
@@ -847,7 +1030,7 @@ class PlayScene(Scene):
             if self.data.allow_borrow:
                 self.hud.show_message("Time is running out! Hold SHIFT to borrow time.", 4.0)
             else:
-                self.hud.show_message("Time is running out! Grab golden sand.", 4.0)
+                self.hud.show_message("Time is running out! Grab sulfur crystals.", 4.0)
         elif self.life.top > S.LOW_TIME + 3:
             self.low_time_warned = False
 
@@ -861,7 +1044,7 @@ class PlayScene(Scene):
                 label = "[E] Stop" if target.logic.running else "[E] Start"
                 anchor = target
             else:
-                for s in self.shrines:
+                for s in self.archives:
                     if s.near(b.x, b.z) and self.debt.in_debt:
                         label, anchor = "Hold [E] to repay", s
         if anchor is not None:
@@ -872,11 +1055,122 @@ class PlayScene(Scene):
             self.prompt.hide()
 
         guide = self._active_guide() if self.state == "play" else None
+        # Locks are puzzles: only the problem is shown. The steps appear while H is toggled.
         if guide is None:
             self.hud.set_guide(None, [], 0)
         else:
             lock, progress = guide
-            self.hud.set_guide(lock.title, [st["text"] for st in lock.guide], progress[0])
+            if self.show_hint:
+                steps = [st["text"] for st in lock.guide]
+                self.hud.set_guide(lock.title, steps, progress[0], "Press H to hide the hint.")
+            else:
+                self.hud.set_guide(lock.title, [], 0, "Press H for a hint.")
 
         self.hud.set_muted(self.audio.muted)
         self.hud.update(dt, self.t, self.life, self.debt, self.borrowing)
+
+
+# ---------------------------------------------------------------------------------------
+# (heading, [lines]); a heading of None is a spacer.
+CREDITS = [
+    ("Terminus", ["A PyWeek game about borrowed time"]),
+    ("Developer", ["Senthil Kumaran"]),
+    ("Testers", ["Siddhartha S Obla", "Saharsha S Obla"]),
+    (
+        "Inspired by",
+        [
+            "Isaac Asimov",
+            "for the Foundation stories",
+            "and the world of Terminus",
+        ],
+    ),
+    (
+        "Open source that makes this game run",
+        [
+            "Python",
+            "Guido van Rossum and the Python Software Foundation",
+            "",
+            "Panda3D game engine",
+            "Disney VR Studio, Carnegie Mellon University's",
+            "Entertainment Technology Center, and the Panda3D community",
+            "",
+            "FreeType font rendering",
+            "David Turner, Robert Wilhelm and Werner Lemberg",
+            "",
+            "OpenAL Soft audio",
+            "Chris Robinson",
+            "",
+            "Ogg Vorbis audio",
+            "Xiph.Org Foundation",
+        ],
+    ),
+    (
+        "Font",
+        [
+            "Julius Sans One",
+            "Luciano Vergara, LatinoType",
+            "SIL Open Font License",
+        ],
+    ),
+    (
+        "Tools used to make it",
+        [
+            "uv and Ruff, by Astral",
+            "pytest, by Holger Krekel and the pytest team",
+            "FFmpeg, by Fabrice Bellard and the FFmpeg developers",
+            "Git, by Linus Torvalds and the Git community",
+            "Claude Code, by Anthropic",
+        ],
+    ),
+    ("", ["Thank you for playing."]),
+]
+
+
+class CreditsScene(Scene):
+    """Credits scrolling up over the night sky of Terminus."""
+
+    def enter(self):
+        self.sky = MenuBackdrop(self, DayNight(day=6, night=60, fade=2, time=8.0))
+        # A soft dark column behind the text so the sky doesn't compete with it.
+        column = make_card(-1.2, -1.0, 1.2, 1.0, (0.01, 0.01, 0.04, 0.6), "credits_column")
+        self.node(column).reparentTo(self.base.aspect2d)
+        self.roll = self.node(self.base.aspect2d.attachNewNode("credits_roll"))
+        z = 0.0
+        for heading, lines in CREDITS:
+            if heading:
+                big = heading == CREDITS[0][0]
+                self.text(heading, (0, z), 0.13 if big else 0.07, parent=self.roll, fg=S.GOLD)
+                z -= 0.16 if big else 0.1
+            for line in lines:
+                if line:
+                    self.text(line, (0, z), 0.052, parent=self.roll)
+                z -= 0.075
+            z -= 0.14
+        self.length = -z
+        self.roll_z = -1.15  # start just below the bottom of the screen
+        self.roll.setZ(self.roll_z)
+        self.done = False
+        self.prompt = self.text(
+            "Space / Esc: skip",
+            (-0.06, 0.06),
+            0.04,
+            parent=self.base.a2dBottomRight,
+            fg=(0.7, 0.7, 0.8, 1),
+            align=TextNode.ARight,
+        )
+        self.bind("confirm", self.finish)
+        self.bind("pause", self.finish)
+        self.audio.play_music("win")
+
+    def finish(self):
+        if not self.done:
+            self.done = True
+            self.game.change_scene(lambda: TitleScene(self.game))
+
+    def update(self, dt):
+        super().update(dt)
+        self.sky.update(dt, self.t)
+        self.roll_z += S.CREDITS_SCROLL_SPEED * dt
+        self.roll.setZ(self.roll_z)
+        if self.roll_z > 1.15 + self.length:  # the last line has left the top
+            self.finish()

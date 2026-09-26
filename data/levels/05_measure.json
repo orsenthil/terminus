@@ -1,14 +1,14 @@
 {
   "name": "Freedom",
-  "subtitle": "Measure the time. Repay the debt. Set yourself free.",
-  "start_sand": 99,
+  "subtitle": "Fifteen seconds, from a seven and an eleven. Then walk out free.",
+  "start_time": 99,
   "allow_borrow": true,
   "exit_requires_no_debt": true,
   "signs": [
-    "Locks open only if you measure their time. Follow the steps at the top of the screen.",
-    "Start the lock, then stop it when its time is up. Within 1 second counts.",
-    "One glass after another adds up: 7 + 11 = 18.",
-    "The last door opens only if you owe no time. Repay at the shrine, then walk out free."
+    "Each lock opens only for the exact time it shows. There is no timer here, only water clocks. Press H if you get stuck.",
+    "Press E on a lock to start it, and E again to stop it. Within 1 second counts.",
+    "The water left behind is time you can still spend.",
+    "The last door opens only if you owe no time. Repay at the Archive, then walk out free."
   ],
   "glasses": [
     {
@@ -36,10 +36,10 @@
       "glasses": [
         0
       ],
-      "title": "Lock: measure 7 seconds using the 7s glass",
+      "title": "Lock: measure 7 seconds using a 7s water clock.",
       "guide": [
         {
-          "text": "Flip the 7s glass (press E beside it).",
+          "text": "Flip the 7s clock (press E beside it).",
           "on": [
             "flip:0"
           ]
@@ -51,7 +51,7 @@
           ]
         },
         {
-          "text": "When the glass shows EMPTY!, press E on the lock to STOP it.",
+          "text": "When the clock shows EMPTY!, press E on the lock to STOP it.",
           "on": [
             "stop"
           ]
@@ -59,7 +59,7 @@
       ]
     },
     {
-      "target": 18,
+      "target": 15,
       "gates": [
         1
       ],
@@ -67,28 +67,29 @@
         1,
         2
       ],
-      "title": "Lock: measure 18 seconds = 7s glass, then 11s glass",
+      "title": "Lock: measure 15 seconds using a 7s and an 11s water clock.",
       "guide": [
         {
-          "text": "Flip the 7s glass (on the left).",
+          "text": "Flip BOTH clocks: the 7s on the left and the 11s on the right.",
           "on": [
-            "flip:1"
+            "flip:1",
+            "flip:2"
           ]
         },
         {
-          "text": "Press E on the lock to START it.",
+          "text": "Stand at the lock. When the 7s clock shows EMPTY!, press E to START.",
           "on": [
             "start"
           ]
         },
         {
-          "text": "When the 7s glass shows EMPTY!, flip the 11s glass (on the right).",
+          "text": "4 seconds later (11 - 7) the 11s clock shows EMPTY!. Flip it again at once.",
           "on": [
             "flip:2"
           ]
         },
         {
-          "text": "When the 11s glass shows EMPTY!, press E on the lock to STOP it.",
+          "text": "When the 11s clock shows EMPTY! again (4 + 11 = 15), press E to STOP.",
           "on": [
             "stop"
           ]

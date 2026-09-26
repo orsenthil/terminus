@@ -12,7 +12,7 @@ def test_starts_in_full_day():
     dn = make()
     assert dn.night == 0
     assert not dn.is_night
-    assert dn.sand() == pytest.approx(S.SAND_DAY)
+    assert dn.water() == pytest.approx(S.WATER_DAY)
 
 
 def test_dusk_blends_into_night():
@@ -23,10 +23,10 @@ def test_dusk_blends_into_night():
     assert dn.is_night
 
 
-def test_full_night_is_dark_and_purple():
+def test_full_night_is_dark_and_water_is_purple():
     dn = make(40)
     assert dn.night == pytest.approx(1)
-    assert dn.sand() == pytest.approx(S.SAND_NIGHT)
+    assert dn.water() == pytest.approx(S.WATER_NIGHT)
     assert sum(dn.sky()[:3]) < sum(S.DAY_SKY[:3])
 
 

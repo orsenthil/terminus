@@ -1,10 +1,10 @@
 {
   "name": "The Loan",
   "subtitle": "In Terminus, time can be borrowed.",
-  "start_sand": 12,
+  "start_time": 12,
   "allow_borrow": true,
   "signs": [
-    "Your task: cross these ruins. You don't have the time.",
+    "Your task: cross this frozen ground. You don't have the time.",
     "Terminus lends time. Hold LEFT SHIFT to borrow from your future.",
     "Every borrowed second is a debt. And something comes to collect it.",
     "Outrun it, or pay. Those are the only ways."

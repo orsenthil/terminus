@@ -4,11 +4,30 @@ Nothing in this module imports Panda3D, so the pure-logic modules and tests can 
 """
 
 import os
+import sys
 
 # --- Paths -------------------------------------------------------------------------------
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _find_root():
+    """Where assets/ and data/ live: the project folder when run from source; next to the
+    executable in a standalone Windows/Linux build; Contents/Resources in a macOS app."""
+    if not getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    for candidate in (exe_dir, os.path.join(exe_dir, os.pardir, "Resources")):
+        if os.path.isdir(os.path.join(candidate, "data")):
+            return os.path.normpath(candidate)
+    return exe_dir
+
+
+ROOT_DIR = _find_root()
 ASSETS_DIR = os.path.join(ROOT_DIR, "assets")
 LEVELS_DIR = os.path.join(ROOT_DIR, "data", "levels")
+# Julius Sans One (SIL Open Font License, see assets/fonts/OFL.txt) for all game text.
+FONT_PATH = os.path.join(ASSETS_DIR, "fonts", "JuliusSansOne-Regular.ttf")
+FONT_BOLDNESS = 0.5  # extra stroke thickness (the font has only one thin weight)
+TEXT_WIDTH = 1.15  # horizontal stretch applied to all text, for a wider look
 
 # --- Window / debug ----------------------------------------------------------------------
 WINDOW_TITLE = "Terminus"
@@ -20,6 +39,7 @@ PHYSICS_STEP = 1.0 / 120.0
 MAX_FRAME_DT = 0.1  # clamp long frames so the accumulator can't spiral
 FADE_TIME = 0.3  # scene transition fade (each direction)
 LEVEL_INTRO_TIME = 2.0
+CREDITS_SCROLL_SPEED = 0.11  # aspect2d units per second (the screen is 2 units tall)
 
 # --- Camera ------------------------------------------------------------------------------
 VIEW_WIDTH_TILES = 30.0
@@ -48,12 +68,12 @@ SQUASH_AMOUNT = 0.25
 SQUASH_RECOVER = 10.0
 
 # --- Life hourglass ----------------------------------------------------------------------
-START_SAND = 60.0
+START_TIME = 60.0  # seconds of water in the life clock at the start of a level
 LIFE_MAX = 99.0  # the top chamber can't hold more than this
-PICKUP_SAND = 5.0
+PICKUP_TIME = 5.0  # seconds a sulfur crystal buys
 
 # --- Debt --------------------------------------------------------------------------------
-BORROW_RATE = 5.0  # seconds of sand per second of holding borrow
+BORROW_RATE = 5.0  # seconds of time per second of holding borrow
 INTEREST_RATE = 0.10
 INTEREST_PERIOD = 10.0
 DEBT_CAP = 60.0
@@ -68,56 +88,66 @@ COLLECTOR_STING_REARM = 8.0
 COLLECTOR_SPAWN_MARGIN = 1.5  # tiles beyond the left edge of the view
 COLLECTOR_MIN_SPAWN_DISTANCE = 14.0  # never appear closer than this to the player
 
-# --- Shrines -----------------------------------------------------------------------------
-SHRINE_POUR_RATE = 10.0
-SHRINE_MIN_LIFE = 1.0  # pouring stops before it would kill you
-SHRINE_RADIUS = 1.2
+# --- Archives (checkpoints where you repay) ----------------------------------------------
+ARCHIVE_POUR_RATE = 10.0
+ARCHIVE_MIN_LIFE = 1.0  # repaying stops before it would kill you
+ARCHIVE_RADIUS = 1.2
 
 # --- Interactables -----------------------------------------------------------------------
 INTERACT_RADIUS = 1.4
 PICKUP_RADIUS = 0.7
 LOCK_TOLERANCE = 1.0  # seconds either side of the target
-SPIKE_HEIGHT = 0.45
+PIT_HEIGHT = 0.45  # height of the deadly zone above a sulfur pit tile
 
 # --- Particles ---------------------------------------------------------------------------
-PARTICLE_POOL = 220
+PARTICLE_POOL = 400
+SNOWFALL_RATE = 9.0  # flakes per second drifting across the view
+VENT_STEAM_RATE = 5.0  # steam puffs per second from each nearby vent
 PARTICLE_GRAVITY = 12.0
 
 # --- Colours (r, g, b, a) ----------------------------------------------------------------
-SKY_COLOR = (0.05, 0.07, 0.2, 1)
-SAND_TOP = (0.93, 0.78, 0.45, 1)
-SAND_BODY = (0.72, 0.52, 0.3, 1)
-SAND_DEEP = (0.5, 0.34, 0.2, 1)
-GOLD = (1.0, 0.82, 0.3, 1)
+# Terminus: ice and frost over dark basalt, sulfur the only colour in the rock.
+FROST_TOP = (0.9, 0.94, 1.0, 1)  # snow on the upper face of exposed ground
+ICE = (0.6, 0.7, 0.8, 1)  # front of the exposed ground
+ROCK = (0.3, 0.29, 0.34, 1)  # basalt
+ROCK_DEEP = (0.2, 0.19, 0.24, 1)
+SULFUR = (0.95, 0.85, 0.2, 1)
+SULFUR_GLOW = (1.0, 0.95, 0.55, 1)
+GOLD = (1.0, 0.82, 0.3, 1)  # UI accent (titles, lock marks)
 GOLD_GLOW = (1.0, 0.9, 0.5, 1)
-STONE = (0.55, 0.47, 0.4, 1)
-GLASS = (0.75, 0.88, 1.0, 0.25)
+STONE = (0.5, 0.52, 0.58, 1)
 GATE_COLOR = (0.35, 0.25, 0.45, 1)
-BRIDGE_COLOR = (1.0, 0.8, 0.35, 0.9)
-SPIKE_COLOR = (0.9, 0.1, 0.1, 1)  # red: danger, day or night
+BRIDGE_COLOR = (0.55, 0.8, 1.0, 0.9)  # ice bridges
+PIT_MOLTEN = (0.42, 0.07, 0.04, 1)  # molten sulfur runs dark red when hot
+PIT_SURFACE = (0.95, 0.35, 0.1, 1)  # its glowing surface
+PIT_FLAME = (0.3, 0.55, 1.0, 0.75)  # burning sulfur has a blue flame
+PIT_FLAME_CORE = (0.75, 0.88, 1.0, 0.9)
 PLAYER_CLOAK = (0.2, 0.55, 0.85, 1)
 PLAYER_SKIN = (0.95, 0.8, 0.65, 1)
 COLLECTOR_COLOR = (0.05, 0.0, 0.08, 0.8)
 DEBT_RED = (0.9, 0.15, 0.1, 1)
 TEXT_COLOR = (1.0, 0.93, 0.75, 1)
+SNOW = (0.92, 0.95, 1.0, 1)
+STEAM = (0.85, 0.85, 0.8, 0.6)
 DEBT_TINT_MAX_ALPHA = 0.45
 DEBT_TINT_COLOR = (0.08, 0.0, 0.16, 1)  # debt darkens the world with a violet shadow
 
 # --- Day / night -------------------------------------------------------------------------
-DAY_LENGTH = 35.0  # seconds of daylight (including dusk)
-NIGHT_LENGTH = 25.0  # seconds of night (including dawn)
-DUSK_LENGTH = 5.0  # blend time at each end of the day
-DAY_SKY = (0.42, 0.68, 0.95, 1)
-DUSK_SKY = (0.85, 0.42, 0.38, 1)
-NIGHT_SKY = (0.02, 0.02, 0.07, 1)
-DAY_AMBIENT = (0.6, 0.58, 0.62, 1)
-DAY_SUN = (0.8, 0.72, 0.55, 1)
-NIGHT_AMBIENT = (0.14, 0.12, 0.26, 1)
-NIGHT_SUN = (0.14, 0.15, 0.32, 1)
-DAY_LAYER_SCALE = (1.0, 0.95, 1.0, 1)
-NIGHT_LAYER_SCALE = (0.28, 0.26, 0.48, 1)
-SAND_DAY = GOLD
-SAND_NIGHT = (0.72, 0.42, 1.0, 1)  # hourglass sand glows purple at night
+# A red dwarf sun: short, dim, reddish days and long, dark nights under four moons.
+DAY_LENGTH = 20.0  # seconds of daylight (including dusk)
+NIGHT_LENGTH = 40.0  # seconds of night (including dawn)
+DUSK_LENGTH = 4.0  # blend time at each end of the day
+DAY_SKY = (0.5, 0.36, 0.4, 1)
+DUSK_SKY = (0.3, 0.12, 0.18, 1)
+NIGHT_SKY = (0.01, 0.01, 0.035, 1)
+DAY_AMBIENT = (0.55, 0.52, 0.6, 1)
+DAY_SUN = (0.85, 0.55, 0.45, 1)  # red dwarf light
+NIGHT_AMBIENT = (0.14, 0.13, 0.25, 1)
+NIGHT_SUN = (0.18, 0.2, 0.38, 1)  # moonlight
+DAY_LAYER_SCALE = (1.0, 0.92, 0.95, 1)
+NIGHT_LAYER_SCALE = (0.3, 0.3, 0.5, 1)
+WATER_DAY = (0.45, 0.8, 1.0, 1)  # the water in every clock
+WATER_NIGHT = (0.72, 0.42, 1.0, 1)  # glows purple at night
 LANTERN_COLOR = (1.0, 0.8, 0.5, 1)  # the player's light at night
 LANTERN_ATTENUATION = (1.0, 0.0, 0.05)
 
@@ -140,6 +170,8 @@ KEYS = {
     "menu_up": ["arrow_up", "w"],
     "menu_down": ["arrow_down", "s"],
     "confirm": ["space", "enter"],
+    "hint": ["h"],
+    "credits": ["c"],
 }
 
 # --- Audio -------------------------------------------------------------------------------
@@ -181,4 +213,4 @@ MUSIC_VOLUME = 0.7
 SFX_VOLUME = 0.9
 
 # --- Levels ------------------------------------------------------------------------------
-LEVEL_ORDER = ["01_sand", "02_the_loan", "03_interest", "04_flip", "05_measure"]
+LEVEL_ORDER = ["01_thaw", "02_the_loan", "03_interest", "04_flip", "05_measure"]

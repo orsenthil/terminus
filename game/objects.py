@@ -1,9 +1,10 @@
-"""In-world objects: sand pickups, shrines, pedestal glasses, gates, bridges, timer locks,
-exits and signs. Each object owns its nodes; logic is kept small and explicit."""
+"""In-world objects: sulfur crystal pickups, archives, pedestal water clocks, gates, ice
+bridges, timer locks, exits and signs. Each object owns its nodes; logic is kept small and
+explicit."""
 
 import math
 
-from panda3d.core import TransparencyAttrib
+from panda3d.core import ClockObject, Plane, PlaneNode, Point3, TransparencyAttrib, Vec3
 
 from game import settings as S
 from game.hourglass import Hourglass
@@ -20,61 +21,97 @@ def _glass_shape(mb, w, h, y, color):
     mb.flat_tri((-w, -h), (0, 0), (w, -h), color, y)
 
 
-class SandDisplay:
-    """Two sand triangles inside an hourglass silhouette, scaled by how full each chamber is.
+class WaterDisplay:
+    """The water in a two-chamber water clock.
 
-    The top chamber's sand is an inverted triangle hanging from the neck; the bottom pile is
-    a triangle sitting on the floor. Scaling by sqrt(fraction) keeps the area proportional.
+    Each chamber holds a full triangle of water that is cut off at the water line by a clip
+    plane, so the surface stays flat like a real liquid. The top chamber narrows toward the
+    neck, the bottom chamber widens toward its floor; heights are chosen so the visible area
+    matches the fraction of water in each. A single drop falls through the neck while the
+    clock runs.
     """
 
-    def __init__(self, parent, w, h, color=S.GOLD, y=-0.02):
+    def __init__(self, parent, w, h, color=S.WATER_DAY, y=-0.02):
         self.w, self.h = w, h
-        self.root = parent.attachNewNode("sand_display")
-        mb = MeshBuilder("top_sand")
-        mb.flat_tri((-w, h), (w, h), (0, 0), color, y)
-        self.top = mb.node()
-        self.top.reparentTo(self.root)
-        mb = MeshBuilder("bottom_sand")
-        mb.flat_tri((-w, 0), (w, 0), (0, h), color, y)
-        self.bottom = mb.node()
-        self.bottom.reparentTo(self.root)
-        self.bottom.setZ(-h)
-        mb = MeshBuilder("stream")
-        mb.rect(-0.02 * w / 0.3, -h, 0.02 * w / 0.3, 0, color, y - 0.01)
-        self.stream = mb.node()
-        self.stream.reparentTo(self.root)
-        for np in (self.top, self.bottom, self.stream):
+        self.root = parent.attachNewNode("water_display")
+        self.chambers = []
+        for name, pts in (
+            ("top_water", ((-w, h), (w, h), (0, 0))),
+            ("bottom_water", ((-w, -h), (0, 0), (w, -h))),
+        ):
+            mb = MeshBuilder(name)
+            mb.flat_tri(*pts, color, y)
+            water = mb.node()
+            water.reparentTo(self.root)
+            line = self.root.attachNewNode(
+                PlaneNode(name + "_line", Plane(Vec3(0, 0, -1), Point3(0, 0, 0)))
+            )
+            water.setClipPlane(line)
+            self.chambers.append((water, line))
+        mb = MeshBuilder("drop")
+        r = max(0.012, w * 0.07)
+        mb.rect(-r, -r * 1.6, r, r * 1.6, color, y - 0.01)
+        self.drop = mb.node()
+        self.drop.reparentTo(self.root)
+        for np in (self.chambers[0][0], self.chambers[1][0], self.drop):
             np.setTwoSided(True)
             np.setLightOff()
+        self.bottom_level = -h
+
+    @property
+    def top(self):
+        return self.chambers[0][0]
+
+    @property
+    def bottom(self):
+        return self.chambers[1][0]
 
     def set_color(self, color):
-        """Recolour the sand (gold by day, purple by night)."""
-        for np in (self.top, self.bottom, self.stream):
+        """Recolour the water (blue by day, purple by night)."""
+        for np in (self.top, self.bottom, self.drop):
             np.setColor(*color)
 
     def set_fill(self, top_frac, bottom_frac, flowing):
+        h = self.h
         top_frac = max(0.0, min(1.0, top_frac))
         bottom_frac = max(0.0, min(1.0, bottom_frac))
-        # The top pile shrinks from its surface: keep the apex at the neck.
-        s = math.sqrt(top_frac)
-        self.top.setScale(max(s, 1e-3), 1, max(s, 1e-3))
-        self.top.setZ(0)
+        # Top chamber: water from the neck (z=0) up to h*sqrt(f) holds a fraction f.
+        self.chambers[0][1].setZ(h * math.sqrt(top_frac))
         self.top.show() if top_frac > 0.001 else self.top.hide()
-        s = math.sqrt(bottom_frac)
-        self.bottom.setScale(max(s, 1e-3), 1, max(s, 1e-3))
+        # Bottom chamber: water from the floor (z=-h) up to h*(1-sqrt(1-f)).
+        self.bottom_level = -h + h * (1.0 - math.sqrt(1.0 - bottom_frac))
+        self.chambers[1][1].setZ(self.bottom_level)
         self.bottom.show() if bottom_frac > 0.001 else self.bottom.hide()
-        self.stream.show() if flowing else self.stream.hide()
+        if flowing:
+            k = (ClockObject.getGlobalClock().getFrameTime() * 2.5) % 1.0
+            self.drop.setZ(-k * k * (0 - self.bottom_level) - 0.02)
+            self.drop.show()
+        else:
+            self.drop.hide()
 
 
 class Pickup:
+    """A cluster of glowing sulfur crystals. Collecting it buys time."""
+
     def __init__(self, parent, tile):
         self.x, self.z = tile[0] + 0.5, tile[1] + 0.3
         self.collected = False
         self.root = parent.attachNewNode("pickup")
-        mb = MeshBuilder("pile")
-        mb.flat_tri((-0.35, 0), (0.35, 0), (0, 0.35), S.GOLD, -0.1)
-        mb.flat_tri((-0.2, 0.05), (0.25, 0.05), (0.02, 0.5), S.GOLD_GLOW, -0.12)
-        mb.rect(-0.08, 0.5, 0.08, 0.66, S.GOLD_GLOW, -0.12)
+        mb = MeshBuilder("sulfur")
+        for cx, w, top, color in (
+            (-0.2, 0.11, 0.42, S.SULFUR),
+            (0.2, 0.1, 0.36, S.SULFUR),
+            (0.0, 0.14, 0.62, S.SULFUR_GLOW),
+        ):
+            mb.quad(
+                (cx - w, -0.1, 0.1),
+                (cx, -0.1, 0.0),
+                (cx + w, -0.1, 0.1),
+                (cx, -0.1, top),
+                color,
+                (0, -1, 0),
+            )
+        mb.flat_tri((-0.03, 0.2), (0.07, 0.25), (0.0, 0.5), S.SULFUR_GLOW, -0.12)  # facet
         np = mb.node()
         np.setTwoSided(True)
         np.setLightOff()
@@ -84,41 +121,51 @@ class Pickup:
 
     def update(self, dt, t):
         if not self.collected:
-            self.root.setZ(self.z - 0.3 + 0.08 * math.sin(t * 3 + self.phase))
-            self.root.setR(6 * math.sin(t * 2 + self.phase))
+            self.root.setZ(self.z - 0.3 + 0.06 * math.sin(t * 3 + self.phase))
+            glow = 0.85 + 0.15 * math.sin(t * 4 + self.phase)
+            self.root.setColorScale(glow, glow, glow, 1)
 
     def set_collected(self, value):
         self.collected = value
         self.root.hide() if value else self.root.show()
 
 
-class Shrine:
+class Archive:
+    """A stone archive terminal: a checkpoint, and where you repay your time debt."""
+
     def __init__(self, parent, tile):
         self.x, self.z = tile[0] + 0.5, tile[1]
         self.active = False
-        self.root = parent.attachNewNode("shrine")
+        self.root = parent.attachNewNode("archive")
         self.root.setPos(self.x, 0.1, self.z)
-        mb = MeshBuilder("shrine")
-        stone = (0.62, 0.55, 0.5, 1)
-        mb.box(-0.6, -0.4, 0, 0.6, 0.4, 0.25, stone)
-        mb.box(-0.5, -0.35, 1.95, 0.5, 0.35, 2.15, stone)
-        mb.box(-0.55, -0.1, 0.25, -0.45, 0.1, 1.95, stone)
-        mb.box(0.45, -0.1, 0.25, 0.55, 0.1, 1.95, stone)
-        body = mb.node()
-        body.reparentTo(self.root)
-        mb = MeshBuilder("shrine_glass")
-        _glass_shape(mb, 0.4, 0.8, -0.3, (0.45, 0.6, 0.8, 0.55))
-        glass = mb.node()
-        glass.setTransparency(TransparencyAttrib.MAlpha)
-        glass.setLightOff()
-        glass.setTwoSided(True)
-        glass.reparentTo(self.root)
-        glass.setZ(1.1)
-        self.sand = SandDisplay(glass, 0.36, 0.72, y=-0.32)
-        self.sand.set_fill(0.2, 0.6, False)
+        mb = MeshBuilder("archive")
+        stone, dark = S.STONE, (0.36, 0.37, 0.43, 1)
+        mb.box(-0.75, -0.45, 0, 0.75, 0.45, 0.3, dark)
+        mb.box(-0.6, -0.4, 0.3, 0.6, 0.4, 2.2, stone, top_color=S.FROST_TOP)
+        mb.box(-0.68, -0.43, 2.2, 0.68, 0.43, 2.35, dark, top_color=S.FROST_TOP)
+        mb.node().reparentTo(self.root)
+        # The terminal's screen: rows of glowing record lines, and a small water clock.
+        mb = MeshBuilder("screen")
+        mb.rect(-0.45, 1.25, 0.45, 2.05, (0.05, 0.12, 0.2, 1), -0.41)
+        for k in range(5):
+            z = 1.35 + k * 0.14
+            mb.rect(-0.38, z, -0.38 + 0.2 + 0.08 * ((k * 3) % 4), z + 0.05, (0.4, 0.8, 1, 1), -0.42)
+        self.screen = mb.node()
+        self.screen.setLightOff()
+        self.screen.reparentTo(self.root)
+        mb = MeshBuilder("archive_clock")
+        _glass_shape(mb, 0.28, 0.42, -0.43, (0.45, 0.6, 0.8, 0.55))
+        clock = mb.node()
+        clock.setTransparency(TransparencyAttrib.MAlpha)
+        clock.setLightOff()
+        clock.setTwoSided(True)
+        clock.reparentTo(self.root)
+        clock.setZ(0.72)
+        self.water = WaterDisplay(clock, 0.25, 0.38, y=-0.44)
+        self.water.set_fill(0.3, 0.5, False)
         self.glow = self.root.attachNewNode("glow")
         mb = MeshBuilder("glow")
-        mb.rect(-0.9, 0, 0.9, 2.6, (1, 0.8, 0.3, 0.3), 0.45)
+        mb.rect(-1.0, 0, 1.0, 2.7, (0.4, 0.75, 1.0, 0.25), 0.5)
         g = mb.node()
         g.setTransparency(TransparencyAttrib.MAlpha)
         g.setLightOff()
@@ -127,21 +174,22 @@ class Shrine:
         self.pouring = False
 
     def near(self, px, pz):
-        return abs(px - self.x) < S.SHRINE_RADIUS and abs(pz - self.z) < 1.5
+        return abs(px - self.x) < S.ARCHIVE_RADIUS and abs(pz - self.z) < 1.5
 
     def set_active(self, value):
         self.active = value
         self.glow.show() if value else self.glow.hide()
 
     def update(self, dt, t):
-        flow = 0.2 + 0.1 * math.sin(t * 0.5)
-        self.sand.set_fill(flow, 0.6 if not self.pouring else 0.6 + 0.1 * math.sin(t * 8), True)
+        level = 0.5 if not self.pouring else 0.5 + 0.1 * math.sin(t * 8)
+        self.water.set_fill(0.3 + 0.05 * math.sin(t * 0.5), level, True)
+        self.screen.setColorScale(*([0.8 + 0.2 * math.sin(t * 3)] * 3), 1)
         if self.active:
             self.glow.setAlphaScale(0.7 + 0.3 * math.sin(t * 2))
 
 
 class PedestalGlass:
-    """A small hourglass on a pedestal. Linked gates/bridges are active while it runs."""
+    """A small water clock on a pedestal. Linked gates/bridges are active while it runs."""
 
     def __init__(self, parent, tile, capacity, gates=(), bridges=()):
         self.x, self.z = tile[0] + 0.5, tile[1]
@@ -159,7 +207,7 @@ class PedestalGlass:
         self.flipper = self.root.attachNewNode("flipper")
         self.flipper.setZ(1.35)
         mb = MeshBuilder("glass")
-        wood = (0.45, 0.28, 0.14, 1)
+        wood = (0.34, 0.36, 0.44, 1)  # dark metal caps
         mb.box(-0.42, -0.2, 0.72, 0.42, 0.2, 0.8, wood)
         mb.box(-0.42, -0.2, -0.8, 0.42, 0.2, -0.72, wood)
         frame = mb.node()
@@ -171,12 +219,12 @@ class PedestalGlass:
         bulbs.setTwoSided(True)
         bulbs.setLightOff()
         bulbs.reparentTo(self.flipper)
-        self.sand = SandDisplay(self.flipper, 0.32, 0.66, y=-0.25)
+        self.water = WaterDisplay(self.flipper, 0.32, 0.66, y=-0.25)
         # Capacity label on the pedestal so glasses can be told apart at a glance.
         self.label = make_text(
             parent, f"{self.capacity:g}s", (self.x, -2, self.z + 0.2), 0.38, S.TEXT_COLOR
         )
-        # "EMPTY!" flashes above the glass the moment its sand runs out.
+        # "EMPTY!" flashes above the glass the moment its water runs out.
         self.empty_text = make_text(parent, "EMPTY!", (self.x, -2, self.z + 4.0), 0.45, S.GOLD)
         self.empty_text.hide()
         self.empty_flash = 0.0
@@ -199,7 +247,7 @@ class PedestalGlass:
         self.refresh()
 
     def update(self, dt, t):
-        """Advance the glass. Returns True on the step its sand runs out."""
+        """Advance the glass. Returns True on the step its water runs out."""
         was_running = self.running
         self.glass.update(dt)
         if self.spin > 0:
@@ -219,7 +267,7 @@ class PedestalGlass:
 
     def refresh(self):
         c = self.capacity
-        self.sand.set_fill(
+        self.water.set_fill(
             self.glass.top / c, self.glass.bottom / c, self.running and not self.spin
         )
         self.flipper.setR(self.spin)
@@ -276,7 +324,7 @@ class Gate:
 
 
 class Bridge:
-    """Glowing sand tiles that are solid only while their glass runs."""
+    """Glowing ice tiles that are solid only while their water clock runs."""
 
     def __init__(self, parent, tiles, grid):
         self.tiles = tiles
@@ -416,7 +464,7 @@ class Exit:
         stone = (0.7, 0.6, 0.5, 1)
         mb.box(-1.0, -0.4, 0, -0.7, 0.4, 2.3, stone)
         mb.box(0.7, -0.4, 0, 1.0, 0.4, 2.3, stone)
-        mb.box(-1.2, -0.45, 2.3, 1.2, 0.45, 2.7, stone, top_color=S.SAND_TOP)
+        mb.box(-1.2, -0.45, 2.3, 1.2, 0.45, 2.7, stone, top_color=S.FROST_TOP)
         mb.node().reparentTo(self.root)
         mb = MeshBuilder("door")
         mb.rect(-0.7, 0, 0.7, 2.3, (1, 1, 1, 1), 0.1)
@@ -436,15 +484,10 @@ class Exit:
 
 
 class Sign:
+    """A hint that appears in the air when the player walks near its spot (no signpost)."""
+
     def __init__(self, parent, tile, text):
         self.x, self.z = tile[0] + 0.5, tile[1]
-        self.root = parent.attachNewNode("sign")
-        self.root.setPos(self.x, 0.25, self.z)
-        mb = MeshBuilder("sign")
-        wood = (0.5, 0.33, 0.18, 1)
-        mb.box(-0.06, -0.06, 0, 0.06, 0.06, 0.9, wood)
-        mb.box(-0.4, -0.08, 0.6, 0.4, 0.08, 1.0, (0.62, 0.43, 0.25, 1))
-        mb.node().reparentTo(self.root)
         self.text = make_text(
             parent,
             _wrap(text, 30),
@@ -474,3 +517,36 @@ def _wrap(text, width):
     if line:
         lines.append(line)
     return "\n".join(lines)
+
+
+class PitFlames:
+    """Blue flames dancing over the burning sulfur pits (sulfur burns with a blue flame).
+
+    Purely visual; the deadly zone is fixed at PIT_HEIGHT. Only flames near the camera are
+    animated each frame."""
+
+    def __init__(self, parent, pits):
+        self.root = parent.attachNewNode("pit_flames")
+        self.root.setLightOff()
+        self.root.setTransparency(TransparencyAttrib.MAlpha)
+        self.root.setDepthWrite(False)
+        self.root.setBin("transparent", 20)
+        self.flames = []  # (node, x, phase)
+        for ix, iz in pits:
+            for k, off in enumerate((0.28, 0.72)):
+                mb = MeshBuilder("flame")
+                mb.flat_tri((-0.2, 0), (0.2, 0), (0.0, 0.7), S.PIT_FLAME, 0.0)
+                mb.flat_tri((-0.09, 0), (0.09, 0), (0.0, 0.38), S.PIT_FLAME_CORE, -0.01)
+                np = mb.node()
+                np.setTwoSided(True)
+                np.reparentTo(self.root)
+                np.setPos(ix + off, -0.55, iz + 0.18)
+                self.flames.append((np, ix + off, ix * 1.7 + k * 2.3))
+
+    def update(self, t, cam_x, half_w):
+        for np, x, phase in self.flames:
+            if abs(x - cam_x) > half_w + 1:
+                continue
+            h = 0.75 + 0.25 * math.sin(t * 9 + phase) + 0.15 * math.sin(t * 23 + phase * 3)
+            np.setScale(0.9 + 0.15 * math.sin(t * 13 + phase), 1, h)
+            np.setAlphaScale(0.7 + 0.3 * math.sin(t * 17 + phase * 2))

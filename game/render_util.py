@@ -19,6 +19,8 @@ from panda3d.core import (
     Vec3,
 )
 
+from game import settings as S
+
 
 class MeshBuilder:
     """Accumulates coloured, lit triangles into a single Geom."""
@@ -160,28 +162,36 @@ def make_ring(radius, thickness, color, segments=24, name="ring"):
     return root, parts
 
 
-def make_hourglass_3d(height=2.0, radius=0.7, sand_color=(1, 0.82, 0.3, 1), name="hourglass"):
-    """A lit 3D hourglass: wooden caps, pillars, glass bulbs and a sand pile."""
-    wood = (0.45, 0.28, 0.14, 1)
+def make_hourglass_3d(height=2.0, radius=0.7, water_color=(0.45, 0.8, 1.0, 1), name="hourglass"):
+    """A lit 3D water clock: dark metal caps and posts, glass bulbs, and water that lies
+    flat in each bulb with a thin stream through the neck."""
+    metal = (0.3, 0.32, 0.38, 1)
     glass = (0.7, 0.85, 1.0, 0.35)
     h = height / 2
     root = NodePath(name)
     frame = MeshBuilder(name + "_frame")
     for z0, z1 in ((-h - 0.15, -h), (h, h + 0.15)):
-        frame.frustum(radius * 1.25, radius * 1.25, z0, z1, wood)
-        frame.disc(radius * 1.25, z1, wood, up=True)
-        frame.disc(radius * 1.25, z0, wood, up=False)
+        frame.frustum(radius * 1.25, radius * 1.25, z0, z1, metal)
+        frame.disc(radius * 1.25, z1, metal, up=True)
+        frame.disc(radius * 1.25, z0, metal, up=False)
     for i in range(3):
         a = 2 * math.pi * i / 3 + 0.3
         px, py = radius * 1.05 * math.cos(a), radius * 1.05 * math.sin(a)
-        frame.box(px - 0.05, py - 0.05, -h, px + 0.05, py + 0.05, h, wood)
+        frame.box(px - 0.05, py - 0.05, -h, px + 0.05, py + 0.05, h, metal)
     frame.node().reparentTo(root)
-    sand = MeshBuilder(name + "_sand")
-    sand.frustum(radius * 0.8, 0.05, -h, -h + h * 0.55, sand_color)
-    sand.frustum(0.02, radius * 0.55, h * 0.1, h * 0.45, sand_color)
-    sand.disc(radius * 0.55, h * 0.45, sand_color)
-    sand.frustum(0.03, 0.03, -h, h * 0.1, sand_color, segments=6)
-    sand.node().reparentTo(root)
+
+    def bulb_radius(z):  # radius of the glass at height z (neck at z=0)
+        return 0.08 + (radius - 0.08) * abs(z) / h
+
+    water = MeshBuilder(name + "_water")
+    low = -h + h * 0.4  # water level in the lower bulb
+    water.frustum(bulb_radius(-h) * 0.95, bulb_radius(low) * 0.95, -h, low, water_color)
+    water.disc(bulb_radius(low) * 0.95, low, water_color)
+    high = h * 0.5  # water level in the upper bulb
+    water.frustum(0.07, bulb_radius(high) * 0.95, 0.02, high, water_color)
+    water.disc(bulb_radius(high) * 0.95, high, water_color)
+    water.frustum(0.02, 0.02, low, 0.02, water_color, segments=6)
+    water.node().reparentTo(root)
     bulbs = MeshBuilder(name + "_glass")
     bulbs.frustum(radius, 0.08, -h, 0, glass)
     bulbs.frustum(0.08, radius, 0, h, glass)
@@ -192,6 +202,11 @@ def make_hourglass_3d(height=2.0, radius=0.7, sand_color=(1, 0.82, 0.3, 1), name
     gnp.setBin("transparent", 10)
     gnp.reparentTo(root)
     return root
+
+
+def wide(scale):
+    """Text scale stretched horizontally by TEXT_WIDTH, for OnscreenText."""
+    return (scale * S.TEXT_WIDTH, scale)
 
 
 def make_text(
@@ -211,7 +226,7 @@ def make_text(
         tn.setCardDecal(True)
     np = parent.attachNewNode(tn)
     np.setPos(*pos)
-    np.setScale(scale)
+    np.setScale(scale * S.TEXT_WIDTH, 1, scale)
     np.setLightOff()
     np.setTransparency(TransparencyAttrib.MAlpha)
     # World text floats above everything; no depth so glyphs and shadow never z-fight.

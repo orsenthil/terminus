@@ -1,10 +1,10 @@
 """Tile map loading and level geometry.
 
 Map files are plain text, row 0 = top of the level. Legend:
-    #  solid       .  empty        P  player start    S  sand pickup
-    H  shrine      G  pedestal glass                  D  gate
-    B  sand bridge (solid while its glass runs)       L  timer lock
-    E  exit        ^  spikes       ?  sign
+    #  solid       .  empty        P  player start    S  sulfur crystal (buys time)
+    H  archive     G  pedestal water clock            D  gate
+    B  ice bridge (solid while its water clock runs)  L  timer lock
+    E  exit        ^  burning sulfur pit (deadly)   ?  sign
 Objects that need extra data (glasses, locks, signs) are matched to entries in the level's
 .json file in reading order (top to bottom, left to right). Gates and bridges are groups of
 connected D / B tiles, also numbered in reading order.
@@ -30,7 +30,7 @@ class LevelData:
         self.meta = meta
         self.name = meta.get("name", level_id)
         self.subtitle = meta.get("subtitle", "")
-        self.start_sand = float(meta.get("start_sand", S.START_SAND))
+        self.start_time = float(meta.get("start_time", S.START_TIME))
         self.allow_borrow = bool(meta.get("allow_borrow", True))
         self.exit_requires_no_debt = bool(meta.get("exit_requires_no_debt", False))
 
@@ -41,8 +41,8 @@ class LevelData:
 
         self.solid = set()
         self.player_start = None
-        self.pickups, self.shrines, self.glass_tiles = [], [], []
-        self.lock_tiles, self.exits, self.spikes, self.sign_tiles = [], [], [], []
+        self.pickups, self.archives, self.glass_tiles = [], [], []
+        self.lock_tiles, self.exits, self.pits, self.sign_tiles = [], [], [], []
         gate_tiles, bridge_tiles = [], []
         for row, line in enumerate(self.rows):
             for col, ch in enumerate(line):
@@ -58,7 +58,7 @@ class LevelData:
                 elif ch == "S":
                     self.pickups.append(t)
                 elif ch == "H":
-                    self.shrines.append(t)
+                    self.archives.append(t)
                 elif ch == "G":
                     self.glass_tiles.append(t)
                 elif ch == "D":
@@ -70,7 +70,7 @@ class LevelData:
                 elif ch == "E":
                     self.exits.append(t)
                 elif ch == "^":
-                    self.spikes.append(t)
+                    self.pits.append(t)
                 elif ch == "?":
                     self.sign_tiles.append(t)
         if self.player_start is None:
@@ -154,53 +154,90 @@ def _shade(color, k):
     return (min(1, color[0] * k), min(1, color[1] * k), min(1, color[2] * k), color[3])
 
 
+def find_vents(data):
+    """Surface tiles with a steaming sulfur vent (deterministic per level, decoration only)."""
+    rng = random.Random(data.id + "vents")
+    busy = set(data.pickups + data.archives + data.glass_tiles + data.lock_tiles + data.exits)
+    busy |= set(data.sign_tiles) | set(data.pits) | {data.player_start}
+    vents = []
+    for ix, iz in sorted(data.solid):
+        above = (ix, iz + 1)
+        if above in data.solid or above in busy or rng.random() > 0.05:
+            continue
+        if vents and ix - vents[-1][0] < 8:
+            continue
+        vents.append(above)
+    return vents
+
+
 def build_level_geometry(data, parent):
-    """Build one shallow box per solid tile, then flatten them into a single node."""
+    """Build one shallow box per solid tile, then flatten them into a single node.
+
+    Exposed ground is ice with a cap of frost; below it is dark basalt flecked with sulfur.
+    """
     root = parent.attachNewNode("level_static")
     rng = random.Random(data.id)
+    pits = set(data.pits)
     for ix, iz in sorted(data.solid):
+        if (ix, iz + 1) in pits:
+            # The rock under a burning pit is a trench of hot, dark molten sulfur.
+            mb = MeshBuilder("pit_bed")
+            k = 0.9 + rng.random() * 0.2
+            mb.box(
+                ix, -0.5, iz, ix + 1, 0.5, iz + 1, _shade(S.PIT_MOLTEN, k), top_color=S.PIT_SURFACE
+            )
+            mb.rect(ix, iz + 0.75, ix + 1, iz + 1, _shade(S.PIT_MOLTEN, 1.6), y=-0.51)
+            mb.node().reparentTo(root)
+            continue
         depth = 0
         while depth < 3 and (ix, iz + depth + 1) in data.solid:
             depth += 1
         surface = depth == 0
-        base = (S.SAND_BODY, S.SAND_BODY, S.SAND_DEEP, S.SAND_DEEP)[depth]
-        k = 0.92 + rng.random() * 0.12
-        front = _shade(S.SAND_TOP if surface else base, k * (0.95 if surface else 1.0))
-        top = _shade(S.SAND_TOP, k)
+        k = 0.9 + rng.random() * 0.14
         mb = MeshBuilder("tile")
-        mb.box(ix, -0.5, iz, ix + 1, 0.5, iz + 1, front, top_color=top)
+        if surface:
+            mb.box(ix, -0.5, iz, ix + 1, 0.5, iz + 1, _shade(S.ICE, k), top_color=S.FROST_TOP)
+            # A ragged lip of frost hanging over the front face.
+            lip = 0.12 + rng.random() * 0.12
+            mb.rect(ix, iz + 1 - lip, ix + 1, iz + 1, _shade(S.FROST_TOP, 0.95), y=-0.51)
+        else:
+            base = S.ROCK if depth < 2 else S.ROCK_DEEP
+            mb.box(ix, -0.5, iz, ix + 1, 0.5, iz + 1, _shade(base, k))
+            if rng.random() < 0.12:  # sulfur, the one thing this rock is rich in
+                for _ in range(rng.randint(1, 3)):
+                    fx, fz = ix + rng.uniform(0.15, 0.75), iz + rng.uniform(0.15, 0.75)
+                    sz = rng.uniform(0.06, 0.14)
+                    mb.rect(fx, fz, fx + sz, fz + sz * 0.7, _shade(S.SULFUR, 0.85), y=-0.51)
         mb.node().reparentTo(root)
-    for ix, iz in data.spikes:
-        mb = MeshBuilder("spike")
-        for i in range(3):
-            x0 = ix + i / 3
-            mb.tri(
-                (x0, -0.25, iz),
-                (x0 + 1 / 3, -0.25, iz),
-                (x0 + 1 / 6, 0.0, iz + S.SPIKE_HEIGHT + 0.1),
-                S.SPIKE_COLOR,
-            )
-            mb.tri(
-                (x0, 0.25, iz),
-                (x0 + 1 / 6, 0.0, iz + S.SPIKE_HEIGHT + 0.1),
-                (x0 + 1 / 3, 0.25, iz),
-                _shade(S.SPIKE_COLOR, 0.7),
-            )
-        np = mb.node()
-        np.setTwoSided(True)
-        np.setLightOff()  # spikes stay visible at night
-        np.reparentTo(root)
+    for ix, iz in find_vents(data):
+        mb = MeshBuilder("vent")
+        mb.rect(ix + 0.3, iz - 0.02, ix + 0.7, iz + 0.05, (0.08, 0.07, 0.07, 1), y=-0.52)
+        mb.rect(ix + 0.2, iz - 0.02, ix + 0.3, iz + 0.07, S.SULFUR, y=-0.52)
+        mb.rect(ix + 0.7, iz - 0.02, ix + 0.8, iz + 0.07, S.SULFUR, y=-0.52)
+        mb.node().reparentTo(root)
+    # Burning sulfur pits: a pool of dark molten sulfur with a glowing surface. The blue
+    # flames above it are animated separately (objects.PitFlames).
+    mb = MeshBuilder("pits")
+    for ix, iz in data.pits:
+        mb.box(ix, -0.45, iz, ix + 1, 0.45, iz + 0.22, S.PIT_MOLTEN, top_color=S.PIT_SURFACE)
+        mb.rect(ix, iz + 0.16, ix + 1, iz + 0.22, S.PIT_SURFACE, y=-0.46)
+        for _ in range(2):  # bubbles on the surface
+            bx = ix + rng.uniform(0.15, 0.8)
+            mb.rect(bx, iz + 0.12, bx + 0.08, iz + 0.18, _shade(S.PIT_SURFACE, 1.1), y=-0.47)
+    np = mb.node()
+    np.setLightOff()  # the pits glow, day or night
+    np.reparentTo(root)
     # Bedrock below the bottom row so the ground doesn't end in a hard edge.
     mb = MeshBuilder("bedrock")
     for ix in range(data.width):
         if (ix, 0) in data.solid:
-            mb.box(ix, -0.5, -4, ix + 1, 0.5, 0, _shade(S.SAND_DEEP, 0.8))
+            mb.box(ix, -0.5, -4, ix + 1, 0.5, 0, _shade(S.ROCK_DEEP, 0.8))
     mb.node().reparentTo(root)
-    # A dark backing wall behind the playfield so the level reads as a solid ruin.
+    # A dark backing wall behind the playfield so the level reads as solid rock.
     mb = MeshBuilder("backing")
     for ix, iz in data.solid:
         if (ix, iz + 1) in data.solid or iz == 0:
-            mb.rect(ix - 0.1, iz, ix + 1.1, iz + 1.2, (0.25, 0.17, 0.12, 1), y=0.6)
+            mb.rect(ix - 0.1, iz, ix + 1.1, iz + 1.2, (0.11, 0.11, 0.15, 1), y=0.6)
     mb.node().reparentTo(root)
     root.flattenStrong()
     return root

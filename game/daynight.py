@@ -74,5 +74,5 @@ class DayNight:
     def layer_scale(self):
         return lerp(S.DAY_LAYER_SCALE, S.NIGHT_LAYER_SCALE, self.night)
 
-    def sand(self):
-        return lerp(S.SAND_DAY, S.SAND_NIGHT, self.night)
+    def water(self):
+        return lerp(S.WATER_DAY, S.WATER_NIGHT, self.night)

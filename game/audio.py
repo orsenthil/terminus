@@ -16,7 +16,7 @@ def resolve_cue_path(cue, assets_dir=S.ASSETS_DIR):
     rel = S.AUDIO_CUES[cue]
     stem, _ = os.path.splitext(rel)
     for ext in (".ogg", ".wav"):
-        path = os.path.join(assets_dir, stem + ext)
+        path = os.path.normpath(os.path.join(assets_dir, stem + ext))
         if os.path.isfile(path):
             return path
     return None

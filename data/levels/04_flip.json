@@ -1,13 +1,13 @@
 {
   "name": "Flip",
   "subtitle": "Turn time over and it runs again.",
-  "start_sand": 60,
+  "start_time": 60,
   "allow_borrow": true,
   "signs": [
-    "Glasses on pedestals hold doors open while their sand falls.",
-    "Press E to flip a glass.",
-    "Sand bridges hold only while their glass runs.",
-    "Flip a glass early and you only get back the sand that has fallen."
+    "Water clocks on pedestals hold doors open while their water falls.",
+    "Press E to flip a water clock.",
+    "Ice bridges hold only while their clock runs.",
+    "Flip a clock early and you only get back the water that has fallen."
   ],
   "glasses": [
     {
