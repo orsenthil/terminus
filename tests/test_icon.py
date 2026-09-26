@@ -1,3 +1,6 @@
+import os
+import sys
+
 from game.icon import icon_path, make_icon_image
 
 
@@ -10,7 +13,10 @@ def test_icon_is_an_opaque_rounded_square():
 
 def test_icon_file_is_written():
     path = icon_path()
-    assert path is not None and path.endswith(".png")
+    # Windows only accepts .ico window icons; everywhere else gets a .png.
+    expected = ".ico" if sys.platform == "win32" else ".png"
+    assert path is not None and path.endswith(expected)
+    assert os.path.isfile(path)
 
 
 def test_windows_ico_wraps_the_png(tmp_path):
